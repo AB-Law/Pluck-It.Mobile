@@ -90,4 +90,105 @@ struct PluckIt_MobileTests {
         #expect(item?.size?.system == nil)
     }
 
+    @Test func stylistChatEventDecodesTokenAndToolEvents() throws {
+        let tokenPayload = """
+        {
+          "type": "token",
+          "content": "hello",
+          "traceId": "trace-1",
+          "runId": "run-1",
+          "model": "gpt",
+          "tokenCount": 1,
+          "toolLatencyMs": 12
+        }
+        """
+        let tokenData = try #require(tokenPayload.data(using: .utf8))
+        let tokenEvent = try JSONDecoder().decode(StylistChatEvent.self, from: tokenData)
+
+        switch tokenEvent {
+        case let .token(content, traceId, runId, model, tokenCount, toolLatencyMs):
+            #expect(content == "hello")
+            #expect(traceId == "trace-1")
+            #expect(runId == "run-1")
+            #expect(model == "gpt")
+            #expect(tokenCount == 1)
+            #expect(toolLatencyMs == 12)
+        default:
+            #expect(Bool(false), "Expected token event")
+        }
+
+        let toolPayload = """
+        {"type":"tool_use","name":"search_wardrobe","trace_id":"trace-2","run_id":"run-2","tool_latency_ms":25}
+        """
+        let toolData = try #require(toolPayload.data(using: .utf8))
+        let toolEvent = try JSONDecoder().decode(StylistChatEvent.self, from: toolData)
+
+        switch toolEvent {
+        case let .toolUse(name, traceId, runId, _, _, _):
+            #expect(name == "search_wardrobe")
+            #expect(traceId == "trace-2")
+            #expect(runId == "run-2")
+        default:
+            #expect(Bool(false), "Expected tool_use event")
+        }
+    }
+
+    @Test func stylistSSEParserBuildsEventsFromLines() throws {
+        var parser = StylistSSEParser()
+        var events: [StylistChatEvent] = []
+
+        events += parser.consume(line: "data: {\"type\":\"token\",\"content\":\"hello\"}")
+        #expect(events.isEmpty)
+
+        events += parser.consume(line: "")
+        #expect(events.count == 1)
+        guard case let .token(content, _, _, _, _, _) = events.first! else {
+            #expect(Bool(false), "Expected token event")
+            return
+        }
+        #expect(content == "hello")
+        events = []
+
+        events += parser.consume(line: "event: ignored")
+        events += parser.consume(line: "data: {\"type\":\"done\"}")
+        events += parser.consume(line: "")
+        #expect(events.count == 1)
+        guard case .done = events.first! else {
+            #expect(Bool(false), "Expected done event")
+            return
+        }
+    }
+
+    @Test func stylistChatEventFallbacksTraceIdFromRequest() throws {
+        let event = StylistChatEvent.done(nil, nil, nil, nil, nil)
+            .withDefaultTraceId("trace-fallback")
+        switch event {
+        case let .done(traceId, _, _, _, _):
+            #expect(traceId == "trace-fallback")
+        default:
+            #expect(Bool(false), "Expected done event")
+        }
+    }
+
+    @Test func stylistChatRequestUsesExpectedJSONKeys() throws {
+        let request = StylistChatRequest(
+            message: "Find me a blue jacket",
+            recentMessages: [
+                StylistMessage(role: .user, content: "Need something casual")
+            ],
+            selectedItemIds: ["item-1", "item-2"],
+            traceId: "trace-abc"
+        )
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try #require(encoder.encode(request))
+        let raw = try #require(JSONSerialization.jsonObject(with: data, options: [] ) as? [String: Any])
+
+        #expect(raw["message"] as? String == "Find me a blue jacket")
+        #expect(raw["trace_id"] as? String == "trace-abc")
+        #expect(raw["selected_item_ids"] as? [String] == ["item-1", "item-2"])
+        #expect(raw["recent_messages"] is [[String: Any]])
+    }
+
 }

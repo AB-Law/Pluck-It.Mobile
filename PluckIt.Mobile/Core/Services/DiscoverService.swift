@@ -32,11 +32,7 @@ final class DiscoverService {
     }
 
     func fetchSources() async throws -> [ScraperSource] {
-        do {
-            let response: ScraperSourcesResponse = try await client.send(method: "GET", path: "\(basePath)/sources")
-            return response.sources
-        } catch {
-            return try await client.send(method: "GET", path: "\(basePath)/sources")
-        }
+        let response: ScraperSourcesResponse = try await client.send(method: "GET", path: "\(basePath)/sources")
+        return response.sources
     }
 }
