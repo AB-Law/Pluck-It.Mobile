@@ -20,6 +20,7 @@ struct WardrobeUploadView: View {
     @State private var reviewItem: ClothingItem?
     @State private var reviewQueueId: UUID?
     @State private var isLoadingDrafts = false
+    @State private var activeQueueActionItemId: UUID?
 
     private var hasProcessingItems: Bool {
         queue.contains { $0.isProcessing }
@@ -31,20 +32,9 @@ struct WardrobeUploadView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
-                    Label("Add photos", systemImage: "photo.badge.plus")
-                        .font(.subheadline)
-                        .frame(maxWidth: .infinity)
-                        .padding(PluckTheme.Spacing.sm)
-                        .background(PluckTheme.accent)
-                        .foregroundStyle(PluckTheme.background)
-                        .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
-                }
-                .padding(PluckTheme.Spacing.md)
-                .onChange(of: photoPickerItems) {
-                    Task { await enqueueSelectedPhotos() }
-                }
+            VStack(spacing: PluckTheme.Spacing.md) {
+                uploadHeader
+                    .pluckReveal(delay: 0.03)
 
                 if isLoadingDrafts {
                     Spacer()
@@ -52,32 +42,26 @@ struct WardrobeUploadView: View {
                         .foregroundStyle(PluckTheme.secondaryText)
                     Spacer()
                 } else if queue.isEmpty {
-                    Spacer()
-                    VStack(spacing: PluckTheme.Spacing.sm) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.largeTitle)
-                            .foregroundStyle(PluckTheme.mutedText)
-                        Text("Select photos to upload")
-                            .foregroundStyle(PluckTheme.secondaryText)
-                        Text("Items will be processed by AI and ready to review.")
-                            .font(.caption)
-                            .foregroundStyle(PluckTheme.mutedText)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, PluckTheme.Spacing.lg)
-                    }
-                    Spacer()
+                    uploadEmptyState
+                        .pluckReveal()
                 } else {
-                    List(queue) { queueItem in
+                    List(Array(queue.enumerated()), id: \.element.id) { index, queueItem in
                         uploadRow(for: queueItem)
+                            .pluckReveal(delay: min(Double(index) * 0.04, 0.3))
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
+            .padding(.vertical, PluckTheme.Spacing.md)
             .navigationTitle("Upload Items")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") {
+                        pluckImpactFeedback()
+                        dismiss()
+                    }
                 }
             }
             .background(PluckTheme.background)
@@ -97,22 +81,70 @@ struct WardrobeUploadView: View {
         }
     }
 
+    private var uploadHeader: some View {
+        VStack(spacing: PluckTheme.Spacing.sm) {
+            PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
+                Label("Add photos", systemImage: "photo.badge.plus")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
+                    .padding(PluckTheme.Spacing.md)
+                    .background(PluckTheme.accent)
+                    .foregroundStyle(PluckTheme.background)
+                    .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.medium))
+            }
+            .onChange(of: photoPickerItems) {
+                pluckImpactFeedback()
+                Task { await enqueueSelectedPhotos() }
+            }
+
+            Text("Draft queue: \(pendingDraftCountText)")
+                .font(.caption2)
+                .foregroundStyle(PluckTheme.mutedText)
+        }
+        .padding(.horizontal, PluckTheme.Spacing.md)
+        .pluckReveal()
+    }
+
+    private var uploadEmptyState: some View {
+        VStack(spacing: PluckTheme.Spacing.sm) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.largeTitle)
+                .foregroundStyle(PluckTheme.mutedText)
+            Text("Select photos to upload")
+                .foregroundStyle(PluckTheme.secondaryText)
+            Text("Items will be processed by AI and ready to review.")
+                .font(.caption)
+                .foregroundStyle(PluckTheme.mutedText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, PluckTheme.Spacing.lg)
+        }
+        .padding(.horizontal, PluckTheme.Spacing.md)
+        .padding(.vertical, 64)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .fill(PluckTheme.card)
+        )
+        .padding(.horizontal, PluckTheme.Spacing.md)
+        .pluckReveal()
+    }
+
+    private var pendingDraftCountText: String {
+        if queue.isEmpty { return "No drafts yet" }
+        return "\(queue.filter { $0.isReady }.count) of \(queue.count) ready"
+    }
+
     @ViewBuilder
     private func uploadRow(for queueItem: UploadQueueItem) -> some View {
         HStack(spacing: PluckTheme.Spacing.sm) {
-            Image(uiImage: UIImage(data: queueItem.imageData) ?? UIImage())
-                .resizable()
-                .scaledToFill()
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
-                .background(PluckTheme.card)
+            uploadImage(queueItem.imageData)
 
             VStack(alignment: .leading, spacing: 4) {
                 if let draftId = queueItem.draftId,
                    let item = draftItems[draftId],
                    let brand = item.brand ?? item.category {
                     Text(brand)
-                        .font(.caption)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(PluckTheme.primaryText)
                 }
                 stateLabel(for: queueItem.state)
@@ -129,6 +161,20 @@ struct WardrobeUploadView: View {
         }
         .padding(.vertical, PluckTheme.Spacing.xs)
         .listRowBackground(PluckTheme.background)
+        .padding(.horizontal, PluckTheme.Spacing.md)
+    }
+
+    @ViewBuilder
+    private func uploadImage(_ data: Data) -> some View {
+        Image(uiImage: UIImage(data: data) ?? UIImage())
+            .resizable()
+            .scaledToFill()
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+            .overlay(
+                RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                    .stroke(PluckTheme.border, lineWidth: 0.8)
+            )
     }
 
     @ViewBuilder
@@ -156,10 +202,12 @@ struct WardrobeUploadView: View {
 
     @ViewBuilder
     private func actionButton(for queueItem: UploadQueueItem) -> some View {
+        let isActionBusy = activeQueueActionItemId == queueItem.id
         switch queueItem.state {
         case .ready:
             if let draftId = queueItem.draftId, let item = draftItems[draftId] {
                 Button("Review") {
+                    pluckImpactFeedback(.medium)
                     reviewItem = item
                     reviewQueueId = queueItem.id
                 }
@@ -170,13 +218,40 @@ struct WardrobeUploadView: View {
         case .failed:
             HStack(spacing: PluckTheme.Spacing.xs) {
                 if let draftId = queueItem.draftId {
-                    Button("Retry") { Task { await retryQueueItem(queueItem, draftId: draftId) } }
+                    if isActionBusy {
+                        ProgressView("Retrying")
+                            .font(.caption2)
+                    } else {
+                        Button("Retry") {
+                            runQueueAction(for: queueItem) {
+                                await retryQueueItem(queueItem, draftId: draftId)
+                            }
+                        }
                         .font(.caption).foregroundStyle(PluckTheme.info)
-                    Button("Dismiss") { Task { await dismissQueueItem(queueItem, draftId: draftId) } }
+                    }
+                    if isActionBusy {
+                        ProgressView("Removing")
+                            .font(.caption2)
+                    } else {
+                        Button("Dismiss") {
+                            runQueueAction(for: queueItem) {
+                                await dismissQueueItem(queueItem, draftId: draftId)
+                            }
+                        }
                         .font(.caption).foregroundStyle(PluckTheme.danger)
+                    }
                 } else {
-                    Button("Re-upload") { Task { await uploadQueueItem(queueItem) } }
-                        .font(.caption).foregroundStyle(PluckTheme.info)
+                    if isActionBusy {
+                        ProgressView("Uploading")
+                            .font(.caption2)
+                    } else {
+                        Button("Re-upload") {
+                            runQueueAction(for: queueItem) {
+                                await uploadQueueItem(queueItem)
+                            }
+                        }
+                            .font(.caption).foregroundStyle(PluckTheme.info)
+                    }
                 }
             }
         default:
@@ -185,6 +260,19 @@ struct WardrobeUploadView: View {
     }
 
     // MARK: - Load existing drafts on open
+
+    private func runQueueAction(for queueItem: UploadQueueItem, operation: @escaping () async -> Void) {
+        guard activeQueueActionItemId != queueItem.id else { return }
+        pluckImpactFeedback(.light)
+        activeQueueActionItemId = queueItem.id
+        Task {
+            await operation()
+            await MainActor.run {
+                activeQueueActionItemId = nil
+            }
+        }
+    }
+
 
     private func loadExistingDrafts() async {
         isLoadingDrafts = true

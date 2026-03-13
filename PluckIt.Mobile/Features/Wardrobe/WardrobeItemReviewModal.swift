@@ -131,6 +131,7 @@ struct WardrobeItemReviewModal: View {
                                 Text(tag)
                                 Spacer()
                                 Button("Remove") {
+                                    pluckImpactFeedback(.light)
                                     removeTag(tag)
                                 }
                                 .font(.caption)
@@ -142,6 +143,7 @@ struct WardrobeItemReviewModal: View {
                         TextField("Add tag", text: $tagInput)
                             .autocapitalization(.none)
                         Button("Add") {
+                            pluckImpactFeedback(.light)
                             addTag()
                         }
                     }
@@ -157,6 +159,7 @@ struct WardrobeItemReviewModal: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: PluckTheme.Spacing.sm) {
                         ForEach(careOptions, id: \.0) { option in
                             Button {
+                                pluckImpactFeedback(.light)
                                 toggleCare(option.0)
                             } label: {
                                 Text(option.1)
@@ -175,6 +178,7 @@ struct WardrobeItemReviewModal: View {
                             .foregroundStyle(PluckTheme.secondaryText)
                     } else {
                         Button("Log wear") {
+                            pluckImpactFeedback(.light)
                             Task { await logWear() }
                         }
                         .foregroundStyle(PluckTheme.primaryText)
@@ -194,6 +198,7 @@ struct WardrobeItemReviewModal: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        pluckImpactFeedback(.light)
                         dismiss()
                     }
                     .foregroundStyle(PluckTheme.secondaryText)
@@ -203,6 +208,7 @@ struct WardrobeItemReviewModal: View {
                         ProgressView()
                     } else {
                         Button("Save") {
+                            pluckImpactFeedback(.light)
                             Task { await saveChanges() }
                         }
                         .fontWeight(.semibold)
@@ -213,6 +219,8 @@ struct WardrobeItemReviewModal: View {
             .task {
                 await loadProfileCurrencyIfNeeded()
             }
+            .scrollContentBackground(.hidden)
+            .background(PluckTheme.background)
         }
     }
 

@@ -6,25 +6,37 @@ struct AppRootView: View {
     @EnvironmentObject private var navState: MobileNavState
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             MobileShellView()
                 .environmentObject(appServices)
                 .environmentObject(navState)
+                .transition(.opacity)
+                .pluckReveal()
 
             if !appServices.networkMonitor.isOnline {
                 VStack {
-                    Text("Offline")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.7))
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
-                        .padding(.top, 8)
+                    HStack {
+                        Label("Offline", systemImage: "wifi.slash")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, PluckTheme.Spacing.md)
+                            .padding(.vertical, 6)
+                            .background(.black.opacity(0.75))
+                            .foregroundStyle(PluckTheme.primaryText)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(PluckTheme.border, lineWidth: 1)
+                            )
+                        Spacer()
+                    }
+                    .padding(.horizontal, PluckTheme.Spacing.md)
+                    .padding(.top, PluckTheme.Spacing.md)
+
                     Spacer()
                 }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.22), value: appServices.networkMonitor.isOnline)
         .sheet(isPresented: $navState.isProfileOpen) {
             ProfileOverlay()
                 .environmentObject(appServices)
@@ -33,5 +45,6 @@ struct AppRootView: View {
             DigestPanelView()
                 .environmentObject(appServices)
         }
+        .preferredColorScheme(.dark)
     }
 }

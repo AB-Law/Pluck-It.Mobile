@@ -58,8 +58,10 @@ struct WardrobeView: View {
             Group {
                 if isDataLoading {
                     stateLoadingView()
+                        .pluckReveal()
                 } else if let errorText {
                     stateErrorView(errorText: errorText, retryLabel: "Retry wardrobe")
+                        .pluckReveal()
                 } else if items.isEmpty {
                     VStack(spacing: PluckTheme.Spacing.sm) {
                         Image(systemName: "tshirt")
@@ -71,48 +73,18 @@ struct WardrobeView: View {
                         Text("Sync your wardrobe and items will appear here.")
                             .foregroundStyle(PluckTheme.secondaryText)
                         Button("Refresh") {
+                            pluckImpactFeedback()
                             startLoad(refresh: true)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(PluckTheme.accent)
                     }
+                    .pluckReveal()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    VStack(spacing: 0) {
-                        HStack(spacing: PluckTheme.Spacing.sm) {
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundStyle(PluckTheme.secondaryText)
-                                TextField("Search wardrobe", text: $searchText)
-                                    .foregroundStyle(PluckTheme.primaryText)
-                                    .autocorrectionDisabled()
-                                    .textInputAutocapitalization(.never)
-                                    .submitLabel(.search)
-                                    .onSubmit { startLoad(refresh: true) }
-                            }
-                            .padding(10)
-                            .background(PluckTheme.card)
-                            .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
-
-                            Menu {
-                                ForEach(WardrobeSortMode.allCases, id: \.self) { mode in
-                                    Button(mode.rawValue) {
-                                        sortMode = mode
-                                        startLoad(refresh: true)
-                                    }
-                                }
-                            } label: {
-                                Label("Sort", systemImage: "arrow.up.arrow.down")
-                                    .labelStyle(.iconOnly)
-                                    .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
-                                    .background(PluckTheme.card)
-                                    .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
-                                    .foregroundStyle(PluckTheme.primaryText)
-                            }
-                        }
-                        .padding(.horizontal, PluckTheme.Spacing.md)
-                        .padding(.top, PluckTheme.Spacing.md)
-
+                    VStack(spacing: PluckTheme.Spacing.md) {
+                        searchSection
+                            .pluckReveal(delay: 0.03)
                         List {
                             Section(
                                 header: Text("\(visibleItems.count) ITEM\(visibleItems.count == 1 ? "" : "S")")
@@ -120,12 +92,15 @@ struct WardrobeView: View {
                                     .foregroundStyle(PluckTheme.secondaryText)
                                     .textCase(.uppercase)
                             ) {
-                                ForEach(visibleItems) { item in
+                                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { indexedItem in
+                                    let item = indexedItem.element
                                     WardrobeCardView(item: item)
                                         .contentShape(Rectangle())
                                         .onTapGesture {
+                                            pluckImpactFeedback(.light)
                                             selectedItem = item
                                         }
+                                        .pluckReveal(delay: min(Double(indexedItem.offset) * 0.03, 0.28))
                                 }
 
                                 if nextToken != nil {
@@ -136,6 +111,7 @@ struct WardrobeView: View {
                                                 .foregroundStyle(PluckTheme.secondaryText)
                                         } else {
                                             Button(loadMoreStateText) {
+                                                pluckImpactFeedback(.light)
                                                 startLoad(refresh: false)
                                             }
                                             .foregroundStyle(PluckTheme.info)
@@ -152,11 +128,13 @@ struct WardrobeView: View {
             .navigationTitle("Wardrobe")
             .navigationBarTitleDisplayMode(.inline)
             .background(PluckTheme.background)
+            .scrollContentBackground(.hidden)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: PluckTheme.Spacing.xs) {
                         if pendingDraftCount > 0 {
                             Button {
+                                pluckImpactFeedback(.light)
                                 isUploadPresented = true
                             } label: {
                                 HStack(spacing: 4) {
@@ -173,6 +151,7 @@ struct WardrobeView: View {
                             }
                         }
                         Button {
+                            pluckImpactFeedback(.light)
                             isUploadPresented = true
                         } label: {
                             Image(systemName: "plus")
@@ -331,5 +310,41 @@ struct WardrobeView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var searchSection: some View {
+        HStack(spacing: PluckTheme.Spacing.sm) {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(PluckTheme.secondaryText)
+                TextField("Search wardrobe", text: $searchText)
+                    .foregroundStyle(PluckTheme.primaryText)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.search)
+                    .onSubmit { startLoad(refresh: true) }
+            }
+            .padding(10)
+            .background(PluckTheme.card)
+            .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+
+            Menu {
+                ForEach(WardrobeSortMode.allCases, id: \.self) { mode in
+                    Button(mode.rawValue) {
+                        sortMode = mode
+                        startLoad(refresh: true)
+                    }
+                }
+            } label: {
+                Label("Sort", systemImage: "arrow.up.arrow.down")
+                    .labelStyle(.iconOnly)
+                    .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
+                    .background(PluckTheme.card)
+                    .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+                    .foregroundStyle(PluckTheme.primaryText)
+            }
+        }
+        .padding(.horizontal, PluckTheme.Spacing.md)
+        .padding(.top, PluckTheme.Spacing.md)
     }
 }

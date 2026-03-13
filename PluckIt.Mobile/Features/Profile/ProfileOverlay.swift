@@ -20,20 +20,28 @@ struct ProfileOverlay: View {
                 VStack(spacing: PluckTheme.Spacing.md) {
                     if loading && profile == nil {
                         stateLoadingView
+                            .pluckReveal()
                     } else {
                         if let errorText {
                             inlineErrorBanner(errorText)
+                                .pluckReveal()
                         }
                         if let saveError {
                             inlineErrorBanner(saveError)
+                                .pluckReveal()
                         }
                         if let profile {
                             identitySection(for: profile)
+                                .pluckReveal()
                         }
                         preferencesSection
+                            .pluckReveal()
                         bodyMeasurementsSection
+                            .pluckReveal()
                         styleIdentitySection
+                            .pluckReveal()
                         aiPersonalisationSection
+                            .pluckReveal()
                     }
                 }
                 .padding(.horizontal, PluckTheme.Spacing.md)
@@ -44,13 +52,17 @@ struct ProfileOverlay: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        pluckImpactFeedback(.light)
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if saving {
                         ProgressView()
                     } else {
                         Button("Save") {
+                            pluckImpactFeedback()
                             Task { await savePreferences() }
                         }
                         .fontWeight(.semibold)
@@ -61,6 +73,7 @@ struct ProfileOverlay: View {
             }
             .task { await loadAll() }
             .refreshable { await loadAll(force: true) }
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -78,6 +91,7 @@ struct ProfileOverlay: View {
                         : "Token-backed session"
                 )
                 Button("Sign out") {
+                    pluckImpactFeedback()
                     appServices.authService.signOut()
                 }
                 .font(.footnote)
@@ -186,6 +200,7 @@ struct ProfileOverlay: View {
             ForEach(aesthetics, id: \.self) { tag in
                 let selected = editedPrefs.stylePreferences.contains(tag)
                 Button {
+                    pluckImpactFeedback(.light)
                     if selected {
                         editedPrefs.stylePreferences.removeAll { $0 == tag }
                     } else {

@@ -130,6 +130,7 @@ struct VaultFilterSidebarView: View {
 
                 Section {
                     Button("Reset to defaults") {
+                        pluckImpactFeedback(.light)
                         draft = VaultFilters()
                     }
                     .foregroundStyle(PluckTheme.danger)
@@ -139,10 +140,14 @@ struct VaultFilterSidebarView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        pluckImpactFeedback(.light)
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
+                        pluckImpactFeedback()
                         filters = draft
                         onApply()
                         dismiss()
@@ -150,6 +155,8 @@ struct VaultFilterSidebarView: View {
                     .fontWeight(.semibold)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PluckTheme.background)
         }
     }
 

@@ -82,23 +82,39 @@ struct WardrobeCardView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(displayTitle)
-                    .font(.headline.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(PluckTheme.title)
                     .lineLimit(1)
 
                 Text(statusLine)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(PluckTheme.secondaryText)
                     .lineLimit(1)
 
                 Text(shortTags)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(item.tags?.isEmpty == false ? PluckTheme.secondaryText : PluckTheme.mutedText)
                     .lineLimit(1)
+                if let category = item.category, !category.isEmpty {
+                    Text(category.uppercased())
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(PluckTheme.accent)
+                        .textCase(.uppercase)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(PluckTheme.card)
+                        .clipShape(Capsule())
+                }
             }
             .padding(.vertical, PluckTheme.Spacing.xxs)
             Spacer()
         }
-        .padding(.vertical, PluckTheme.Spacing.sm)
+        .padding(PluckTheme.Spacing.md)
+        .background(PluckTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+        .overlay(
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .stroke(PluckTheme.border, lineWidth: 1)
+        )
     }
 }

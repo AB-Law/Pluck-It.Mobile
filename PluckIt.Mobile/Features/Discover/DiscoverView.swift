@@ -121,6 +121,7 @@ struct DiscoverView: View {
             ScrollView {
                 VStack(spacing: PluckTheme.Spacing.md) {
                     controlsHeader
+                        .pluckReveal()
 
                     if let errorText {
                         VStack(spacing: PluckTheme.Spacing.xs) {
@@ -132,20 +133,26 @@ struct DiscoverView: View {
                             Button("Retry") {
                                 restartFeedLoad()
                             }
+                            .onTapGesture { pluckImpactFeedback(.light) }
                             .buttonStyle(.bordered)
                         }
+                        .pluckReveal()
                     }
 
                     if isInitialLoading {
                         stateLoading()
+                            .pluckReveal()
                     } else if visibleItems.isEmpty {
                         stateEmpty()
+                            .pluckReveal()
                     } else {
                         VStack(spacing: PluckTheme.Spacing.sm) {
-                            ForEach(visibleItems) { item in
+                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
                                 discoverCard(for: item)
+                                    .pluckReveal(delay: min(Double(index) * 0.03, 0.3))
                                     .contentShape(Rectangle())
                                     .onTapGesture {
+                                        pluckImpactFeedback(.light)
                                         selectedItem = item
                                     }
                             }
@@ -161,6 +168,7 @@ struct DiscoverView: View {
                                     .padding(.vertical, PluckTheme.Spacing.md)
                                 } else {
                                     Button("Load more") {
+                                        pluckImpactFeedback(.light)
                                         Task { await loadFeed(refresh: false) }
                                     }
                                     .buttonStyle(.bordered)
@@ -179,9 +187,11 @@ struct DiscoverView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(sourceLabel) {
+                        pluckImpactFeedback(.light)
                         Task { await loadSources() }
                     }
                     .font(.caption2)
+                    .foregroundStyle(PluckTheme.accent)
                 }
             }
             .task {
@@ -194,6 +204,7 @@ struct DiscoverView: View {
                 await loadFeed(refresh: true)
             }
             .shellToolbar()
+            .scrollContentBackground(.hidden)
             .sheet(item: $selectedItem) { item in
                 DiscoverItemDetailView(item: item, sources: sources)
                     .environmentObject(appServices)
@@ -212,6 +223,7 @@ struct DiscoverView: View {
                         .textInputAutocapitalization(.never)
                         .submitLabel(.search)
                         .onSubmit {
+                            pluckImpactFeedback(.light)
                             restartFeedLoad()
                         }
                 }
@@ -222,6 +234,7 @@ struct DiscoverView: View {
                 Menu {
                     ForEach(DiscoverSortMode.allCases, id: \.self) { mode in
                         Button(mode.rawValue) {
+                            pluckImpactFeedback(.light)
                             sortMode = mode
                             restartFeedLoad()
                         }
@@ -268,6 +281,7 @@ struct DiscoverView: View {
                     Spacer()
 
                     Button("Clear") {
+                        pluckImpactFeedback(.light)
                         activeSourceId = nil
                         timeRange = .all
                         searchText = ""
@@ -286,6 +300,7 @@ struct DiscoverView: View {
 
                 ForEach(DiscoverTimeRange.allCases, id: \.self) { option in
                     Button(option.label) {
+                        pluckImpactFeedback(.light)
                         timeRange = option
                         restartFeedLoad()
                     }
@@ -394,7 +409,10 @@ struct DiscoverView: View {
     }
 
     private func sourceChip(label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            pluckImpactFeedback()
+            action()
+        } label: {
             Text(label)
                 .font(.caption)
                 .fontWeight(active ? .semibold : .regular)

@@ -26,12 +26,16 @@ struct DiscoverItemDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: PluckTheme.Spacing.md) {
                     gallerySection
+                        .pluckReveal(delay: 0.02)
                     metaSection
+                        .pluckReveal(delay: 0.04)
                     if let links = item.buyLinks, !links.isEmpty {
                         buyLinksSection(links)
+                            .pluckReveal(delay: 0.06)
                     }
                     if let comments = item.commentText, !comments.isEmpty {
                         commentsSection(comments)
+                            .pluckReveal(delay: 0.08)
                     }
                 }
                 .padding(.bottom, PluckTheme.Spacing.xl)
@@ -41,9 +45,14 @@ struct DiscoverItemDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") {
+                        pluckImpactFeedback()
+                        dismiss()
+                    }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PluckTheme.background)
         }
     }
 
@@ -126,6 +135,7 @@ struct DiscoverItemDetailView: View {
     private var feedbackButtons: some View {
         HStack(spacing: PluckTheme.Spacing.sm) {
             Button {
+                pluckImpactFeedback()
                 sendFeedback("up")
             } label: {
                 Image(systemName: votedSignal == "up" ? "hand.thumbsup.fill" : "hand.thumbsup")
@@ -135,6 +145,7 @@ struct DiscoverItemDetailView: View {
                     .clipShape(Circle())
             }
             Button {
+                pluckImpactFeedback()
                 sendFeedback("down")
             } label: {
                 Image(systemName: votedSignal == "down" ? "hand.thumbsdown.fill" : "hand.thumbsdown")
@@ -226,6 +237,7 @@ struct DiscoverItemDetailView: View {
     private func commentsSection(_ comments: String) -> some View {
         VStack(alignment: .leading, spacing: PluckTheme.Spacing.sm) {
             Button {
+                pluckImpactFeedback(.light)
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isCommentsExpanded.toggle()
                 }

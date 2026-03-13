@@ -43,6 +43,11 @@ private struct StylistBubble: Identifiable {
     let createdAt: Date = Date()
 }
 
+private struct FitRationale {
+    let summary: String
+    let tags: [String]
+}
+
 struct StylistView: View {
     @EnvironmentObject private var appServices: AppServices
     @State private var draftText = ""
@@ -60,6 +65,12 @@ struct StylistView: View {
     @State private var lastError: String?
     @State private var receivedAnyEvent = false
     @State private var didTrySendWhileOffline = false
+    private let quickSuggestions = [
+        "Suggest a night out fit",
+        "What goes with my leather jacket?",
+        "Need a travel-ready outfit",
+        "Fresh capsule wardrobe ideas",
+    ]
 
     var body: some View {
         NavigationStack {
@@ -80,6 +91,33 @@ struct StylistView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if sending {
                         ProgressView()
+                    } else if let shareText = shareableTranscript, !shareText.isEmpty {
+                        ShareLink(
+                            item: shareText,
+                            subject: Text("Stylist chat")
+                        ) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundStyle(PluckTheme.accent)
+                        }
+                    } else {
+                        EmptyView()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("New Topic") {
+                        pluckImpactFeedback(.light)
+                        resetConversation()
+                    }
+                }
+            }
+            .overlay(alignment: .top) {
+                if sending && activeToolName == nil {
+                    HStack {
+                        typingBanner
+                            .padding(.horizontal, PluckTheme.Spacing.md)
+                            .padding(.top, 4)
+                        Spacer()
                     }
                 }
             }
@@ -98,12 +136,14 @@ struct StylistView: View {
                 statusBadge
                     .frame(width: 8, height: 8)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("AI Stylist")
-                        .font(.headline)
+                    Text("AI STYLIST")
+                        .font(.title3.weight(.semibold))
+                        .tracking(1.2)
                         .foregroundStyle(PluckTheme.primaryText)
-                    Text("Online · v3.0")
-                        .font(.caption2)
+                    Text("SYSTEM: ONLINE")
+                        .font(.caption)
                         .foregroundStyle(PluckTheme.secondaryText)
+                        .padding(.top, 1)
                 }
             }
 
@@ -117,7 +157,17 @@ struct StylistView: View {
             }
         }
         .padding(.horizontal, PluckTheme.Spacing.md)
-        .padding(.vertical, PluckTheme.Spacing.sm)
+        .padding(.vertical, PluckTheme.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: 0)
+                .fill(PluckTheme.card)
+                .overlay(
+                    Rectangle()
+                        .frame(height: 0.6)
+                        .foregroundStyle(PluckTheme.border),
+                    alignment: .bottom
+                )
+        )
     }
 
     private var statusBadge: some View {
@@ -130,8 +180,9 @@ struct StylistView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: PluckTheme.Spacing.md) {
-                    ForEach(messages) { message in
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                         messageBubble(for: message)
+                            .pluckReveal(delay: min(Double(index) * 0.03, 0.24))
                     }
 
                     if sending, let activeToolName {
@@ -164,6 +215,33 @@ struct StylistView: View {
 
     private var inputBar: some View {
         VStack(spacing: PluckTheme.Spacing.xs) {
+            if !quickSuggestions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: PluckTheme.Spacing.sm) {
+                        ForEach(quickSuggestions, id: \.self) { suggestion in
+                            Button {
+                                pluckImpactFeedback(.light)
+                                sendQuickSuggestion(suggestion)
+                            } label: {
+                                Text(suggestion)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(PluckTheme.secondaryText)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, PluckTheme.Spacing.sm)
+                                    .padding(.vertical, PluckTheme.Spacing.xxs)
+                                    .background(PluckTheme.card)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                                            .stroke(PluckTheme.border, lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+                            }
+                            .disabled(sending)
+                        }
+                    }
+                }
+            }
+
             HStack(spacing: PluckTheme.Spacing.sm) {
                 TextField("Ask your stylist…", text: $draftText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -173,10 +251,12 @@ struct StylistView: View {
                     .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
                     .disabled(sending)
                     .onSubmit {
+                        pluckImpactFeedback(.light)
                         send()
                     }
 
                 Button {
+                    pluckImpactFeedback(.light)
                     send()
                 } label: {
                     Image(systemName: "paperplane.fill")
@@ -257,7 +337,7 @@ struct StylistView: View {
                 Spacer(minLength: 0)
             }
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(message.text)
                     .font(.caption)
                     .foregroundStyle(message.role == .user ? .white : PluckTheme.primaryText)
@@ -275,6 +355,10 @@ struct StylistView: View {
                             CursorDot()
                         }
                 }
+
+                if message.role == .assistant, let rationale = styleRationale(for: message.text) {
+                    fitRationaleCard(for: rationale)
+                }
             }
 
             if message.role == .user {
@@ -285,6 +369,53 @@ struct StylistView: View {
         .padding(.vertical, PluckTheme.Spacing.sm)
         .background(message.role == .user ? PluckTheme.userBubble : PluckTheme.assistantBubble)
         .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+    }
+
+    private var typingBanner: some View {
+        Text("Stylist is generating your next fit...")
+            .font(.caption2)
+            .foregroundStyle(PluckTheme.accent)
+            .padding(.horizontal, PluckTheme.Spacing.md)
+            .padding(.vertical, 8)
+            .background(PluckTheme.card)
+            .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+    }
+
+    @ViewBuilder
+    private func fitRationaleCard(for rationale: FitRationale) -> some View {
+        VStack(alignment: .leading, spacing: PluckTheme.Spacing.xs) {
+            Text("Style Rationale")
+                .font(.caption2.weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(PluckTheme.accent)
+            Text(rationale.summary)
+                .font(.caption)
+                .foregroundStyle(PluckTheme.secondaryText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            HStack(spacing: 6) {
+                ForEach(rationale.tags, id: \.self) { tag in
+                    Text(tag)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(PluckTheme.secondaryText)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(PluckTheme.background.opacity(0.5))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(PluckTheme.border, lineWidth: 1))
+                }
+            }
+        }
+        .padding(PluckTheme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .fill(PluckTheme.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .stroke(PluckTheme.accent.opacity(0.35), lineWidth: 1)
+        )
+        .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
     }
 
     @ViewBuilder
@@ -485,6 +616,73 @@ struct StylistView: View {
         formatter.timeStyle = .short
         return formatter
     }()
+
+    private var shareableTranscript: String? {
+        guard !messages.isEmpty else { return nil }
+        return messages
+            .compactMap { message in
+                let sender = message.role == .user ? "You" : "Stylist"
+                return "\(sender): \(message.text)"
+            }
+            .joined(separator: "\n")
+    }
+
+    private func styleRationale(for text: String) -> FitRationale? {
+        let styleKeywords = ["modern", "minimal", "minimalist", "editorial", "streetwear", "vintage", "casual", "formal"]
+        let lines = text
+            .components(separatedBy: CharacterSet.newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        guard let startIndex = lines.firstIndex(where: { line in
+            let lowercaseLine = line.lowercased()
+            return lowercaseLine.hasPrefix("style rationale") || lowercaseLine.hasPrefix("rationale")
+        }) else {
+            return nil
+        }
+
+        let rationaleLine = lines.dropFirst(startIndex).joined(separator: " ")
+        guard let colonRange = rationaleLine.range(of: ":") else {
+            return nil
+        }
+
+        let rationaleText = String(rationaleLine[colonRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rationaleText.isEmpty else { return nil }
+
+        var detectedTags = styleKeywords
+            .filter { text.lowercased().contains($0) }
+            .map { $0.capitalized }
+            .prefix(3)
+        if detectedTags.isEmpty {
+            detectedTags = ["Modern", "Minimalist", "Editorial"]
+        }
+
+        return FitRationale(summary: String(rationaleText), tags: Array(detectedTags))
+    }
+
+    private func sendQuickSuggestion(_ suggestion: String) {
+        guard !sending else { return }
+        draftText = suggestion
+        send()
+    }
+
+    private func resetConversation() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            messages = [
+                StylistBubble(
+                    role: .assistant,
+                    text: "Ask the stylist for fit and combination ideas."
+                )
+            ]
+            chatHistory = []
+            lastError = nil
+            activeAssistantIndex = nil
+            draftText = ""
+            streamTask?.cancel()
+            streamTask = nil
+            sending = false
+            activeToolName = nil
+        }
+    }
 }
 
 private struct TypingDot: View {

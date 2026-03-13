@@ -8,58 +8,99 @@ struct LoginView: View {
     @State private var errorText: String?
 
     var body: some View {
-        VStack(spacing: PluckTheme.Spacing.lg) {
-            Spacer()
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.12, green: 0.12, blue: 0.16),
+                    PluckTheme.background,
+                    Color(red: 0.06, green: 0.06, blue: 0.10)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
-            VStack(spacing: PluckTheme.Spacing.sm) {
-                Image(systemName: "shield.checkered")
-                    .font(.system(size: 56))
-                    .foregroundStyle(PluckTheme.accent)
-                Text("Welcome to PluckIt")
-                    .font(.title2.bold())
-                    .foregroundStyle(PluckTheme.primaryText)
-                Text("Sign in with Google to connect your wardrobe and unlock synced recommendations.")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(PluckTheme.secondaryText)
-                    .padding(.horizontal, PluckTheme.Spacing.md)
-            }
+            ScrollView {
+                VStack(spacing: PluckTheme.Spacing.xl) {
+                    VStack(spacing: PluckTheme.Spacing.md) {
+                        Image(systemName: "leaf.circle.fill")
+                            .font(.system(size: 64))
+                            .foregroundStyle(.white)
+                            .symbolRenderingMode(.hierarchical)
+                            .frame(width: 86, height: 86)
+                            .background(PluckTheme.card)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(PluckTheme.accent, lineWidth: 1.2)
+                            )
 
-            if let errorText {
-                Text(errorText)
-                    .font(.footnote)
-                    .foregroundStyle(PluckTheme.danger)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, PluckTheme.Spacing.md)
-            }
-
-            Button {
-                Task {
-                    await signInWithGoogle()
-                }
-            } label: {
-                HStack(spacing: PluckTheme.Spacing.sm) {
-                    if isSigningIn {
-                        ProgressView()
-                            .tint(PluckTheme.background)
+                        VStack(spacing: 6) {
+                            Text("Welcome to PluckIt")
+                                .font(.title2.bold())
+                                .foregroundStyle(PluckTheme.primaryText)
+                                .multilineTextAlignment(.center)
+                            Text("Sign in to connect your wardrobe and unlock your weekly AI recommendations.")
+                                .font(.body)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(PluckTheme.secondaryText)
+                                .padding(.horizontal, PluckTheme.Spacing.md)
+                        }
                     }
-                    Text(isSigningIn ? "Signing in..." : "Continue with Google")
-                        .font(.headline)
+                .pluckReveal(delay: 0.04)
+                    .padding(.top, 44)
+
+                    if let errorText {
+                        Text(errorText)
+                            .font(.footnote)
+                            .foregroundStyle(PluckTheme.danger)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, PluckTheme.Spacing.md)
+                    }
+
+                    VStack(spacing: PluckTheme.Spacing.sm) {
+                        Button {
+                            pluckImpactFeedback()
+                            Task {
+                                await signInWithGoogle()
+                            }
+                        } label: {
+                            HStack(spacing: PluckTheme.Spacing.sm) {
+                                if isSigningIn {
+                                    ProgressView()
+                                        .tint(PluckTheme.background)
+                                }
+                                Text(isSigningIn ? "Signing in..." : "Continue with Google")
+                                    .font(.headline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, PluckTheme.Spacing.md)
+                            .background(PluckTheme.accent)
+                            .foregroundStyle(PluckTheme.background)
+                            .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.medium))
+                        }
+                        .pluckReveal(delay: 0.14)
+                        .disabled(isSigningIn)
+                        .buttonStyle(.plain)
+
+                        Text("We keep your data synced securely and only use it for wardrobe intelligence.")
+                            .font(.caption2)
+                            .foregroundStyle(PluckTheme.mutedText)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, PluckTheme.Spacing.xl)
+                    }
+                    .pluckReveal(delay: 0.18)
+                    .padding(.horizontal, PluckTheme.Spacing.md)
+
+                    Spacer(minLength: PluckTheme.Spacing.xxl)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, PluckTheme.Spacing.md)
-                .background(PluckTheme.accent)
-                .foregroundStyle(PluckTheme.background)
-                .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.medium))
+                .padding(.vertical, PluckTheme.Spacing.xl)
             }
-            .disabled(isSigningIn)
-            .padding(.horizontal, PluckTheme.Spacing.md)
-
-            Spacer()
         }
-        .padding(.vertical, PluckTheme.Spacing.xl)
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PluckTheme.background)
+        .preferredColorScheme(.dark)
     }
 
     private func signInWithGoogle() async {

@@ -20,13 +20,20 @@ struct ShellToolbarModifier: ViewModifier {
     }
 
     private func shellBarButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            pluckImpactFeedback(.light)
+            action()
+        } label: {
             Image(systemName: systemName)
-                .font(.subheadline)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(PluckTheme.primaryText)
                 .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
-                .background(PluckTheme.card)
-                .clipShape(Circle())
+                .background(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(PluckTheme.border, lineWidth: 0.8)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18))
         }
     }
 }

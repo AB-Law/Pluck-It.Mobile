@@ -32,12 +32,15 @@ struct VaultView: View {
             Group {
                 if insightsLoading && !hasInsightData && items.isEmpty {
                     stateLoadingView()
+                        .pluckReveal()
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: PluckTheme.Spacing.md) {
                             if let insights {
                                 statsCards(for: insights)
+                                    .pluckReveal()
                                 insightsPanel(for: insights)
+                                    .pluckReveal()
                                 Divider()
                                     .padding(.horizontal, PluckTheme.Spacing.xxs)
                                 Text("CPW signals")
@@ -45,12 +48,15 @@ struct VaultView: View {
                                     .foregroundStyle(PluckTheme.secondaryText)
                                     .textCase(.uppercase)
                                     .padding(.horizontal, PluckTheme.Spacing.md)
+                                    .pluckReveal()
                                 cpwSignalsList(for: insights)
+                                    .pluckReveal()
                                 Divider()
                                     .padding(.horizontal, PluckTheme.Spacing.xxs)
                             }
 
                             itemsSection
+                                .pluckReveal()
                             Spacer(minLength: PluckTheme.Spacing.md)
                         }
                         .padding(.vertical, PluckTheme.Spacing.sm)
@@ -62,6 +68,7 @@ struct VaultView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
+                        pluckImpactFeedback(.light)
                         isFilterPresented = true
                     } label: {
                         ZStack(alignment: .topTrailing) {
@@ -78,6 +85,7 @@ struct VaultView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        pluckImpactFeedback(.light)
                         scheduleInsightsLoad()
                         startItemsLoad(refresh: true)
                     } label: {
@@ -107,6 +115,7 @@ struct VaultView: View {
                 }
                 .environmentObject(appServices)
             }
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -127,7 +136,7 @@ struct VaultView: View {
             }
             .padding(.horizontal, PluckTheme.Spacing.md)
 
-            if itemsLoading && items.isEmpty {
+                if itemsLoading && items.isEmpty {
                 HStack {
                     Spacer()
                     ProgressView("Loading items")
@@ -135,17 +144,23 @@ struct VaultView: View {
                     Spacer()
                 }
                 .padding(PluckTheme.Spacing.md)
+                    .pluckReveal()
             } else if items.isEmpty {
                 Text("No items match the current filters.")
                     .font(.caption)
                     .foregroundStyle(PluckTheme.secondaryText)
                     .padding(.horizontal, PluckTheme.Spacing.md)
+                        .pluckReveal()
             } else {
                 VStack(spacing: PluckTheme.Spacing.xs) {
-                    ForEach(items) { item in
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         vaultItemRow(for: item)
+                            .pluckReveal(delay: min(Double(index) * 0.03, 0.28))
                             .contentShape(Rectangle())
-                            .onTapGesture { selectedItem = item }
+                            .onTapGesture {
+                                pluckImpactFeedback(.light)
+                                selectedItem = item
+                            }
                     }
 
                     if itemsNextToken != nil {
@@ -159,6 +174,7 @@ struct VaultView: View {
                             .padding(.vertical, PluckTheme.Spacing.sm)
                         } else {
                             Button("Load more") {
+                                pluckImpactFeedback(.light)
                                 startItemsLoad(refresh: false)
                             }
                             .buttonStyle(.bordered)
@@ -214,8 +230,15 @@ struct VaultView: View {
                 .font(.caption2)
                 .foregroundStyle(PluckTheme.mutedText)
         }
+        .padding(PluckTheme.Spacing.md)
+        .background(PluckTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+        .overlay(
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .stroke(PluckTheme.border, lineWidth: 0.6)
+        )
         .padding(.horizontal, PluckTheme.Spacing.md)
-        .padding(.vertical, PluckTheme.Spacing.xs)
+        .padding(.bottom, PluckTheme.Spacing.xs)
     }
 
     private func syncItem(_ updated: ClothingItem) {

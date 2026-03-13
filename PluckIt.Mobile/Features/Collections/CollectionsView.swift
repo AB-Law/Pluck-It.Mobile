@@ -37,18 +37,24 @@ struct CollectionsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: PluckTheme.Spacing.md) {
                     controls
+                        .pluckReveal(delay: 0.02)
 
                     if let errorText {
                         stateError(errorText)
+                            .pluckReveal()
                     } else if loading && filteredCollections.isEmpty {
                         stateLoading()
+                            .pluckReveal()
                     } else if filteredCollections.isEmpty {
                         emptyState
+                            .pluckReveal()
                     } else {
                         collectionGrid
+                            .pluckReveal()
 
                         if let selected = selectedCollection {
                             selectionDetails(for: selected)
+                                .pluckReveal()
                         }
                     }
                 }
@@ -60,6 +66,7 @@ struct CollectionsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        pluckImpactFeedback()
                         isCreating = true
                     } label: {
                         Label("New", systemImage: "plus")
@@ -74,6 +81,7 @@ struct CollectionsView: View {
                 await loadCollections()
             }
             .shellToolbar()
+            .scrollContentBackground(.hidden)
             .sheet(isPresented: $isCreating, onDismiss: {
                 newName = ""
                 newDescription = ""
@@ -94,7 +102,10 @@ struct CollectionsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.words)
                         .submitLabel(.search)
-                        .onSubmit { Task { await loadCollections() } }
+                        .onSubmit {
+                            pluckImpactFeedback(.light)
+                            Task { await loadCollections() }
+                        }
                 }
                 .padding(10)
                 .background(PluckTheme.card)
@@ -103,14 +114,17 @@ struct CollectionsView: View {
                 Menu {
                     Button("All") {
                         query = ""
+                        pluckImpactFeedback()
                         Task { await loadCollections() }
                     }
                     Button("Public only") {
                         query = "public"
+                        pluckImpactFeedback()
                         Task { await loadCollections(query: "public") }
                     }
                     Button("Private only") {
                         query = "private"
+                        pluckImpactFeedback()
                         Task { await loadCollections(query: "private") }
                     }
                 } label: {
@@ -127,9 +141,11 @@ struct CollectionsView: View {
 
     private var collectionGrid: some View {
         LazyVStack(spacing: PluckTheme.Spacing.sm) {
-            ForEach(filteredCollections) { collection in
+            ForEach(Array(filteredCollections.enumerated()), id: \.element.id) { index, collection in
                 collectionCard(for: collection)
+                    .pluckReveal(delay: min(Double(index) * 0.03, 0.28))
                     .onTapGesture {
+                        pluckImpactFeedback(.light)
                         withAnimation {
                             selectedCollection = collection
                         }
@@ -218,7 +234,12 @@ struct CollectionsView: View {
                 RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
                     .stroke(PluckTheme.info, lineWidth: 1)
             }
+            else {
+                RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                    .stroke(PluckTheme.border, lineWidth: 0.7)
+            }
         }
+        .animation(.easeInOut(duration: 0.16), value: selectedCollection)
     }
 
     private func placeholderThumb(label: String) -> some View {
@@ -318,6 +339,7 @@ struct CollectionsView: View {
                 .foregroundStyle(PluckTheme.secondaryText)
 
             Button("Create collection") {
+                pluckImpactFeedback()
                 isCreating = true
             }
             .buttonStyle(.bordered)
@@ -340,6 +362,7 @@ struct CollectionsView: View {
 
                 Section {
                     Button("Create") {
+                        pluckImpactFeedback()
                         Task {
                             await createCollection()
                             isCreating = false
@@ -360,6 +383,7 @@ struct CollectionsView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        pluckImpactFeedback()
                         isCreating = false
                     }
                 }

@@ -159,6 +159,31 @@ struct PluckIt_MobileTests {
         }
     }
 
+    @Test func stylistSSEParserCapturesUnknownEventType() throws {
+        var parser = StylistSSEParser()
+        var events: [StylistChatEvent] = []
+
+        events += parser.consume(line: "data: {\"type\":\"weird_type\",\"content\":\"something\"}")
+        events += parser.consume(line: "")
+
+        #expect(events.count == 1)
+        guard case let .unknown(type, _, _, _, _, _) = events.first! else {
+            #expect(Bool(false), "Expected unknown event")
+            return
+        }
+        #expect(type == "weird_type")
+    }
+
+    @Test func stylistSSEParserHandlesHeartbeatPing() throws {
+        var parser = StylistSSEParser()
+        var events: [StylistChatEvent] = []
+
+        events += parser.consume(line: ": keep-alive")
+        events += parser.consume(line: "")
+
+        #expect(events.count == 0)
+    }
+
     @Test func stylistChatEventFallbacksTraceIdFromRequest() throws {
         let event = StylistChatEvent.done(
             traceId: nil,

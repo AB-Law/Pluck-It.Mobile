@@ -62,10 +62,16 @@ struct VaultItemDrawerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") {
+                        pluckImpactFeedback(.light)
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Edit") { isEditPresented = true }
+                    Button("Edit") {
+                        pluckImpactFeedback(.light)
+                        isEditPresented = true
+                    }
                         .foregroundStyle(PluckTheme.info)
                 }
             }
@@ -76,6 +82,7 @@ struct VaultItemDrawerView: View {
                 }
                 .environmentObject(appServices)
             }
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -227,6 +234,7 @@ struct VaultItemDrawerView: View {
     private var actionButtons: some View {
         VStack(spacing: PluckTheme.Spacing.sm) {
             Button {
+                pluckImpactFeedback(.light)
                 Task { await logWear() }
             } label: {
                 if isLoggingWear {

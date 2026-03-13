@@ -27,9 +27,13 @@ struct DigestPanelView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") {
+                        pluckImpactFeedback(.light)
+                        dismiss()
+                    }
                 }
             }
+            .scrollContentBackground(.hidden)
             .task { await load() }
         }
     }
@@ -46,10 +50,12 @@ struct DigestPanelView: View {
                         .font(.caption)
                         .foregroundStyle(PluckTheme.secondaryText)
                         .padding(.horizontal, PluckTheme.Spacing.md)
+                        .pluckReveal()
                 } else {
                     VStack(spacing: PluckTheme.Spacing.sm) {
                         ForEach(Array(digest.suggestions.enumerated()), id: \.offset) { idx, suggestion in
                             suggestionCard(suggestion: suggestion, index: idx, digestId: digest.id)
+                                .pluckReveal(delay: min(Double(idx) * 0.03, 0.28))
                         }
                     }
                     .padding(.horizontal, PluckTheme.Spacing.md)
@@ -105,6 +111,7 @@ struct DigestPanelView: View {
                 Button {
                     let isOpen = index < rationaleOpen.count ? rationaleOpen[index] : false
                     if index < rationaleOpen.count {
+                        pluckImpactFeedback(.light)
                         rationaleOpen[index] = !isOpen
                     }
                 } label: {
@@ -129,6 +136,7 @@ struct DigestPanelView: View {
 
             HStack(spacing: PluckTheme.Spacing.sm) {
                 Button {
+                    pluckImpactFeedback(.light)
                     Task { await sendFeedback(digestId: digestId, index: index, suggestion: suggestion, signal: "up") }
                 } label: {
                     Label("Good pick", systemImage: voted == "up" ? "hand.thumbsup.fill" : "hand.thumbsup")
@@ -139,6 +147,7 @@ struct DigestPanelView: View {
                 .disabled(voted != nil)
 
                 Button {
+                    pluckImpactFeedback(.light)
                     Task { await sendFeedback(digestId: digestId, index: index, suggestion: suggestion, signal: "down") }
                 } label: {
                     Label("Not for me", systemImage: voted == "down" ? "hand.thumbsdown.fill" : "hand.thumbsdown")
@@ -152,6 +161,10 @@ struct DigestPanelView: View {
         .padding(PluckTheme.Spacing.md)
         .background(PluckTheme.card)
         .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+        .overlay(
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .stroke(PluckTheme.border, lineWidth: 0.7)
+        )
     }
 
     private var stateLoading: some View {
@@ -188,7 +201,10 @@ struct DigestPanelView: View {
                 .font(.caption)
                 .foregroundStyle(PluckTheme.secondaryText)
                 .multilineTextAlignment(.center)
-            Button("Retry") { Task { await load() } }
+            Button("Retry") {
+                pluckImpactFeedback(.light)
+                Task { await load() }
+            }
                 .buttonStyle(.bordered)
         }
         .padding()
