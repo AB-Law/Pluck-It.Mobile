@@ -83,6 +83,7 @@ struct StylistView: View {
                     }
                 }
             }
+            .shellToolbar()
             .onAppear {
                 if chatHistory.isEmpty {
                     chatHistory = []
@@ -145,12 +146,12 @@ struct StylistView: View {
                 }
                 .padding(PluckTheme.Spacing.md)
             }
-            .onChange(of: messages.count) { _ in
+            .onChange(of: messages.count) {
                 withAnimation(.easeOut(duration: 0.15)) {
                     proxy.scrollTo("chat-bottom", anchor: .bottom)
                 }
             }
-            .onChange(of: sending) { _ in
+            .onChange(of: sending) {
                 withAnimation(.easeOut(duration: 0.15)) {
                     proxy.scrollTo("chat-bottom", anchor: .bottom)
                 }

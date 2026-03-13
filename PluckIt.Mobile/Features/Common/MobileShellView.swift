@@ -45,30 +45,7 @@ struct MobileShellView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .background(PluckTheme.background)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                shellBarButton(systemName: "person.circle") {
-                    navState.isProfileOpen = true
-                }
-            }
-            ToolbarItem(placement: .navigationBarLeading) {
-                shellBarButton(systemName: "chart.bar") {
-                    navState.isDigestOpen = true
-                }
-            }
-        }
         .preferredColorScheme(.dark)
         .environment(\.colorScheme, .dark)
-    }
-
-    private func shellBarButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.subheadline)
-                .foregroundStyle(PluckTheme.primaryText)
-                .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
-                .background(PluckTheme.card)
-                .clipShape(Circle())
-        }
     }
 }

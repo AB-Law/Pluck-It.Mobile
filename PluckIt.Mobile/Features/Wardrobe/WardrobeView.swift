@@ -5,6 +5,8 @@ struct WardrobeView: View {
     @State private var items: [ClothingItem] = []
     @State private var loading = false
     @State private var loadingMore = false
+    @State private var loadingTask: Task<Void, Never>?
+    @State private var loadingGeneration = 0
     @State private var errorText: String?
     @State private var nextToken: String?
     @State private var selectedItem: ClothingItem?
@@ -13,10 +15,26 @@ struct WardrobeView: View {
 
     private enum WardrobeSortMode: String, CaseIterable {
         case newest = "Newest"
-        case brandAZ = "Brand A-Z"
-        case brandZA = "Brand Z-A"
+        case oldest = "Oldest"
         case mostWorn = "Most Worn"
         case leastWorn = "Least Worn"
+        case priceHigh = "Price: High–Low"
+        case priceLow = "Price: Low–High"
+
+        var sortField: String {
+            switch self {
+            case .newest, .oldest: return "dateAdded"
+            case .mostWorn, .leastWorn: return "wearCount"
+            case .priceHigh, .priceLow: return "price.amount"
+            }
+        }
+
+        var sortDir: String {
+            switch self {
+            case .newest, .mostWorn, .priceHigh: return "desc"
+            case .oldest, .leastWorn, .priceLow: return "asc"
+            }
+        }
     }
 
     private var isDataLoading: Bool {
@@ -27,32 +45,7 @@ struct WardrobeView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var visibleItems: [ClothingItem] {
-        let baseItems: [ClothingItem]
-        if query.isEmpty {
-            baseItems = items
-        } else {
-            baseItems = items.filter { item in
-                item.searchableText().lowercased().contains(query.lowercased())
-            }
-        }
-
-        let sorted = baseItems.sorted { lhs, rhs in
-            switch sortMode {
-            case .newest:
-                return lhs.brand?.localizedCaseInsensitiveCompare(rhs.brand ?? "") == .orderedAscending
-            case .brandAZ:
-                return lhs.brand ?? "" < rhs.brand ?? ""
-            case .brandZA:
-                return lhs.brand ?? "" > rhs.brand ?? ""
-            case .mostWorn:
-                return (lhs.wearCount ?? 0) > (rhs.wearCount ?? 0)
-            case .leastWorn:
-                return (lhs.wearCount ?? 0) < (rhs.wearCount ?? 0)
-            }
-        }
-        return sorted
-    }
+    private var visibleItems: [ClothingItem] { items }
 
     private var loadMoreStateText: String {
         loadingMore ? "Loading more…" : "Load more"
@@ -76,12 +69,12 @@ struct WardrobeView: View {
                         Text("Sync your wardrobe and items will appear here.")
                             .foregroundStyle(PluckTheme.secondaryText)
                         Button("Refresh") {
-                            Task { await refresh() }
+                            startLoad(refresh: true)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(PluckTheme.accent)
                     }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 0) {
                         HStack(spacing: PluckTheme.Spacing.sm) {
@@ -92,6 +85,8 @@ struct WardrobeView: View {
                                     .foregroundStyle(PluckTheme.primaryText)
                                     .autocorrectionDisabled()
                                     .textInputAutocapitalization(.never)
+                                    .submitLabel(.search)
+                                    .onSubmit { startLoad(refresh: true) }
                             }
                             .padding(10)
                             .background(PluckTheme.card)
@@ -101,6 +96,7 @@ struct WardrobeView: View {
                                 ForEach(WardrobeSortMode.allCases, id: \.self) { mode in
                                     Button(mode.rawValue) {
                                         sortMode = mode
+                                        startLoad(refresh: true)
                                     }
                                 }
                             } label: {
@@ -138,7 +134,7 @@ struct WardrobeView: View {
                                                 .foregroundStyle(PluckTheme.secondaryText)
                                         } else {
                                             Button(loadMoreStateText) {
-                                                Task { await loadItems(refresh: false) }
+                                                startLoad(refresh: false)
                                             }
                                             .foregroundStyle(PluckTheme.info)
                                         }
@@ -154,56 +150,78 @@ struct WardrobeView: View {
             .navigationTitle("Wardrobe")
             .navigationBarTitleDisplayMode(.inline)
             .background(PluckTheme.background)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        Task { await refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(PluckTheme.primaryText)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        Task { await refresh() }
-                    } label: {
-                        Label("Sort", systemImage: "line.3.horizontal.decrease")
-                    }
-                }
-            }
             .task {
                 if items.isEmpty {
-                    await loadItems(refresh: true)
+                    await awaitCompletionOfLoad(refresh: true)
                 }
             }
             .refreshable {
-                await refresh()
+                await awaitCompletionOfLoad(refresh: true)
             }
+            .shellToolbar()
             .sheet(item: $selectedItem) { item in
-                WardrobeItemReviewModal(item: item)
+                WardrobeItemReviewModal(item: item) { updated in
+                    syncUpdatedItem(updated)
+                }
             }
         }
     }
 
-    private func refresh() async {
-        await loadItems(refresh: true)
+    private func awaitCompletionOfLoad(refresh: Bool) async {
+        startLoad(refresh: refresh)
+        if let task = loadingTask {
+            await task.value
+        }
     }
 
-    private func loadItems(refresh: Bool = false) async {
-        guard !loading else { return }
+    private func startLoad(refresh: Bool) {
+        if loading && !refresh || (!refresh && nextToken == nil) {
+            return
+        }
+
+        loadingGeneration += 1
+        let generation = loadingGeneration
+        loadingTask?.cancel()
         loading = true
         loadingMore = !refresh
+
+        let requestContinuationToken = refresh ? nil : nextToken
         if refresh {
             nextToken = nil
             items = []
+            errorText = nil
         }
+
+        loadingTask = Task {
+            await runLoad(
+                refresh: refresh,
+                continuationToken: requestContinuationToken,
+                generation: generation
+            )
+        }
+    }
+
+    private func runLoad(refresh: Bool = false, continuationToken: String?, generation: Int) async {
+        defer {
+            if generation == loadingGeneration {
+                loading = false
+                loadingMore = false
+                loadingTask = nil
+            }
+        }
+
+        let currentSort = sortMode
+        let currentQuery = query.isEmpty ? nil : query
+
         do {
             let response = try await appServices.wardrobeService.fetchItems(
-                page: 1,
                 pageSize: 30,
-                continuationToken: nextToken,
-                search: query.isEmpty ? nil : query
+                continuationToken: continuationToken,
+                sortField: currentSort.sortField,
+                sortDir: currentSort.sortDir,
+                query: currentQuery
             )
+            guard generation == loadingGeneration else { return }
             if refresh {
                 items = response.items
             } else {
@@ -212,10 +230,24 @@ struct WardrobeView: View {
             nextToken = response.nextContinuationToken
             errorText = nil
         } catch {
+            guard !isCancellationError(error) else { return }
+            guard generation == loadingGeneration else { return }
             errorText = "Data could not be loaded: \(error)"
         }
-        loadingMore = false
-        loading = false
+    }
+
+    private func syncUpdatedItem(_ updated: ClothingItem) {
+        if let index = items.firstIndex(where: { $0.id == updated.id }) {
+            items[index] = updated
+        }
+        selectedItem = updated
+    }
+
+    private func isCancellationError(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        return (error as? URLError)?.code == .cancelled
     }
 
     private func stateLoadingView() -> some View {
@@ -250,7 +282,7 @@ struct WardrobeView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, PluckTheme.Spacing.lg)
             Button(retryLabel) {
-                Task { await loadItems(refresh: true) }
+                startLoad(refresh: true)
             }
             .buttonStyle(.bordered)
         }

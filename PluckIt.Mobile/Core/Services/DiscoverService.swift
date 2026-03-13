@@ -10,25 +10,21 @@ final class DiscoverService {
 
     func fetchFeed(_ request: DiscoverFeedQuery) async throws -> DiscoverFeedResponse {
         var params: [String: String] = [
-            "page": String(request.page),
             "pageSize": String(request.pageSize)
         ]
-        if let sort = request.sort, !sort.isEmpty {
-            params["sort"] = sort
+        if let sortBy = request.sortBy, !sortBy.isEmpty {
+            params["sortBy"] = sortBy
         }
-        if let query = request.query, !query.isEmpty {
-            params["query"] = query
+        if let sourceIds = request.sourceIds, !sourceIds.isEmpty {
+            params["sourceIds"] = sourceIds.joined(separator: ",")
+        }
+        if let timeRange = request.timeRange, !timeRange.isEmpty {
+            params["timeRange"] = timeRange
         }
         if let continuationToken = request.continuationToken, !continuationToken.isEmpty {
             params["continuationToken"] = continuationToken
         }
-
-        do {
-            return try await client.send(method: "GET", path: "\(basePath)/items", query: params)
-        } catch {
-            let items: [ScrapedItem] = try await client.send(method: "GET", path: "\(basePath)/items", query: params)
-            return DiscoverFeedResponse(items: items, nextContinuationToken: nil)
-        }
+        return try await client.send(method: "GET", path: "\(basePath)/items", query: params)
     }
 
     func fetchSources() async throws -> [ScraperSource] {

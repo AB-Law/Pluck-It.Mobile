@@ -73,6 +73,7 @@ struct CollectionsView: View {
             .refreshable {
                 await loadCollections()
             }
+            .shellToolbar()
             .sheet(isPresented: $isCreating, onDismiss: {
                 newName = ""
                 newDescription = ""
@@ -121,16 +122,6 @@ struct CollectionsView: View {
                 }
             }
 
-            Button {
-                Task { await loadCollections() }
-            } label: {
-                HStack {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Refresh")
-                }
-                .font(.caption)
-                .foregroundStyle(PluckTheme.info)
-            }
         }
     }
 
@@ -422,9 +413,17 @@ struct CollectionsView: View {
                 selectedCollection = nil
             }
         } catch {
-            errorText = String(describing: error)
+            if !isCancelledError(error) {
+                errorText = String(describing: error)
+            }
         }
         loading = false
+    }
+
+    private func isCancelledError(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError { return urlError.code == .cancelled }
+        return false
     }
 
     private func createCollection() async {

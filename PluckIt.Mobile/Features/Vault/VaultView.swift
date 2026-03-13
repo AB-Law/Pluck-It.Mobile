@@ -5,6 +5,7 @@ struct VaultView: View {
     @State private var insights: VaultInsightsResponse?
     @State private var loading = false
     @State private var errorText: String?
+    @State private var loadTask: Task<Void, Never>?
 
     private var hasData: Bool {
         insights != nil
@@ -45,7 +46,7 @@ struct VaultView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        Task { await loadInsights() }
+                        scheduleLoad()
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .foregroundStyle(PluckTheme.primaryText)
@@ -53,11 +54,13 @@ struct VaultView: View {
                 }
             }
             .task {
-                await loadInsights()
+                scheduleLoad()
             }
             .refreshable {
+                loadTask?.cancel()
                 await loadInsights()
             }
+            .shellToolbar()
         }
     }
 
@@ -210,7 +213,7 @@ struct VaultView: View {
                 .padding(.horizontal, PluckTheme.Spacing.md)
 
             Button("Retry") {
-                Task { await loadInsights() }
+                scheduleLoad()
             }
             .buttonStyle(.bordered)
         }
@@ -232,13 +235,23 @@ struct VaultView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "—"
     }
 
+    private func scheduleLoad() {
+        loadTask?.cancel()
+        loadTask = Task { await loadInsights() }
+    }
+
     private func loadInsights() async {
         loading = true
         do {
             insights = try await appServices.vaultInsightsService.fetchInsights()
             errorText = nil
         } catch {
-            errorText = String(describing: error)
+            if !Task.isCancelled && !(error is CancellationError) {
+                let urlError = error as? URLError
+                if urlError?.code != .cancelled {
+                    errorText = String(describing: error)
+                }
+            }
         }
         loading = false
     }

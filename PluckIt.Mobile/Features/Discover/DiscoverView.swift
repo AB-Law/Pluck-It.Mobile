@@ -7,6 +7,7 @@ struct DiscoverView: View {
     @State private var continuationToken: String?
     @State private var loading = false
     @State private var loadingMore = false
+    @State private var feedLoadTask: Task<Void, Never>?
     @State private var errorText: String?
     @State private var searchText = ""
     @State private var activeSourceId: String?
@@ -48,6 +49,21 @@ struct DiscoverView: View {
                 return "All"
             }
         }
+
+        var apiValue: String {
+            switch self {
+            case .oneHour:
+                return "1h"
+            case .oneDay:
+                return "1d"
+            case .sevenDays:
+                return "7d"
+            case .thirtyDays:
+                return "30d"
+            case .all:
+                return "all"
+            }
+        }
     }
 
     private var isInitialLoading: Bool {
@@ -69,8 +85,13 @@ struct DiscoverView: View {
 
     private var visibleItems: [ScrapedItem] {
         let baseItems: [ScrapedItem]
-        if let sourceId = activeSourceId, !sourceId.isEmpty {
-            baseItems = feedItems.filter { $0.source?.id == sourceId }
+        if let activeSourceId = activeSourceId, !activeSourceId.isEmpty {
+            baseItems = feedItems.filter {
+                if let sourceId = $0.sourceId, !sourceId.isEmpty {
+                    return sourceId == activeSourceId
+                }
+                return $0.source?.id == activeSourceId
+            }
         } else {
             baseItems = feedItems
         }
@@ -83,7 +104,7 @@ struct DiscoverView: View {
         return baseItems.filter { item in
             let title = item.title?.lowercased() ?? ""
             let brand = item.brand?.lowercased() ?? ""
-            let sourceName = item.displaySourceName?.lowercased() ?? ""
+            let sourceName = item.resolvedSourceName(from: sources).lowercased()
             let tagMatch = item.tags?.contains { $0.lowercased().contains(query) } == true
             return title.contains(query) || brand.contains(query) || sourceName.contains(query) || tagMatch
         }
@@ -108,7 +129,7 @@ struct DiscoverView: View {
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, PluckTheme.Spacing.lg)
                             Button("Retry") {
-                                Task { await loadFeed(refresh: true) }
+                                restartFeedLoad()
                             }
                             .buttonStyle(.bordered)
                         }
@@ -160,11 +181,14 @@ struct DiscoverView: View {
             }
             .task {
                 await loadSources()
-                await loadFeed(refresh: true)
+                restartFeedLoad()
             }
             .refreshable {
+                feedLoadTask?.cancel()
+                loading = false
                 await loadFeed(refresh: true)
             }
+            .shellToolbar()
         }
     }
 
@@ -179,7 +203,7 @@ struct DiscoverView: View {
                         .textInputAutocapitalization(.never)
                         .submitLabel(.search)
                         .onSubmit {
-                            Task { await loadFeed(refresh: true) }
+                            restartFeedLoad()
                         }
                 }
                 .padding(10)
@@ -190,37 +214,32 @@ struct DiscoverView: View {
                     ForEach(DiscoverSortMode.allCases, id: \.self) { mode in
                         Button(mode.rawValue) {
                             sortMode = mode
-                            Task { await loadFeed(refresh: true) }
+                            restartFeedLoad()
                         }
                     }
                 } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.subheadline)
+                        .foregroundStyle(PluckTheme.primaryText)
                         .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
                         .background(PluckTheme.card)
                         .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
-                        .foregroundStyle(PluckTheme.primaryText)
                 }
             }
 
             if !sources.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: PluckTheme.Spacing.sm) {
-                        Button("All") {
+                        sourceChip(label: "All", active: activeSourceId == nil) {
                             activeSourceId = nil
-                            Task { await loadFeed(refresh: true) }
+                            restartFeedLoad()
                         }
-                        .buttonStyle(.bordered)
-                        .foregroundStyle(activeSourceId == nil ? PluckTheme.primaryText : PluckTheme.secondaryText)
-                        .buttonBorderShape(.capsule)
 
                         ForEach(sources) { source in
-                            Button(source.name) {
+                            sourceChip(label: source.name, active: activeSourceId == source.id) {
                                 activeSourceId = source.id
-                                Task { await loadFeed(refresh: true) }
+                                restartFeedLoad()
                             }
-                            .buttonStyle(.bordered)
-                            .foregroundStyle(activeSourceId == source.id ? PluckTheme.primaryText : PluckTheme.secondaryText)
-                            .buttonBorderShape(.capsule)
                         }
                     }
                     .padding(.vertical, PluckTheme.Spacing.xs)
@@ -243,7 +262,7 @@ struct DiscoverView: View {
                         activeSourceId = nil
                         timeRange = .all
                         searchText = ""
-                        Task { await loadFeed(refresh: true) }
+                        restartFeedLoad()
                     }
                     .buttonStyle(.plain)
                     .font(.caption2)
@@ -259,7 +278,7 @@ struct DiscoverView: View {
                 ForEach(DiscoverTimeRange.allCases, id: \.self) { option in
                     Button(option.label) {
                         timeRange = option
-                        Task { await loadFeed(refresh: true) }
+                        restartFeedLoad()
                     }
                     .buttonStyle(.plain)
                     .font(.caption2)
@@ -329,7 +348,7 @@ struct DiscoverView: View {
                 .foregroundStyle(PluckTheme.primaryText)
                 .lineLimit(2)
 
-            Text(item.displaySourceName ?? item.source?.name ?? "Unknown source")
+            Text(item.resolvedSourceName(from: sources))
                 .font(.caption)
                 .foregroundStyle(PluckTheme.secondaryText)
 
@@ -363,6 +382,20 @@ struct DiscoverView: View {
         .padding(PluckTheme.Spacing.md)
         .background(PluckTheme.card)
         .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+    }
+
+    private func sourceChip(label: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption)
+                .fontWeight(active ? .semibold : .regular)
+                .foregroundStyle(active ? PluckTheme.background : PluckTheme.primaryText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(active ? PluckTheme.accent : PluckTheme.card)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func stateLoading() -> some View {
@@ -420,6 +453,12 @@ struct DiscoverView: View {
         }
     }
 
+    private func restartFeedLoad() {
+        feedLoadTask?.cancel()
+        loading = false
+        feedLoadTask = Task { await loadFeed(refresh: true) }
+    }
+
     private func loadFeed(refresh: Bool = true) async {
         guard !loading else { return }
 
@@ -433,11 +472,15 @@ struct DiscoverView: View {
         loadingMore = !refresh
 
         var request = DiscoverFeedQuery()
-        request.page = 1
         request.pageSize = 24
-        request.sort = sortMode.apiValue
+        request.sortBy = sortMode.apiValue
+        request.timeRange = timeRange.apiValue
         if !normalizedSearch.isEmpty {
             request.query = normalizedSearch
+        }
+        request.sourceIds = activeSourceId.flatMap { sourceId in
+            let trimmed = sourceId.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : [trimmed]
         }
         if !refresh, let continuationToken {
             request.continuationToken = continuationToken
@@ -453,13 +496,21 @@ struct DiscoverView: View {
             continuationToken = response.nextContinuationToken
             errorText = nil
         } catch {
-            errorText = String(describing: error)
-            if refresh {
-                continuationToken = nil
+            if !isCancelledError(error) {
+                errorText = String(describing: error)
+                if refresh {
+                    continuationToken = nil
+                }
             }
         }
 
         loadingMore = false
         loading = false
+    }
+
+    private func isCancelledError(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError { return urlError.code == .cancelled }
+        return false
     }
 }

@@ -88,6 +88,9 @@ final class APIClient {
                 throw error
             }
         } catch {
+            guard !isCancellationError(error) else {
+                throw error
+            }
             logError(context: "Request failed for \(method) \(url.absoluteString)", error: error)
             throw error
         }
@@ -139,6 +142,9 @@ final class APIClient {
                 throw ErrorResponse(statusCode: httpResponse.statusCode, body: bodyText, requestURL: url)
             }
         } catch {
+            guard !isCancellationError(error) else {
+                throw error
+            }
             logError(context: "Action request failed for \(method) \(url.absoluteString)", error: error)
             throw error
         }
@@ -226,5 +232,14 @@ final class APIClient {
         guard debugLoggingEnabled else { return }
         print("🛰 APIClient error: \(context)")
         print("🛰 Error: \(error)")
+    }
+
+    private func isCancellationError(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let cancellationCodes: Set<URLError.Code> = [.cancelled]
+        if let urlError = error as? URLError {
+            return cancellationCodes.contains(urlError.code)
+        }
+        return false
     }
 }

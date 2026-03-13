@@ -219,6 +219,58 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         draftUpdatedAt = try container.decodeIfPresent(String.self, forKey: .draftUpdatedAt)
     }
 
+    init(
+        id: String,
+        imageUrl: String? = nil,
+        rawImageBlobUrl: String? = nil,
+        tags: [String]? = nil,
+        colours: [ClothingColour]? = nil,
+        brand: String? = nil,
+        category: String? = nil,
+        price: ClothingPrice? = nil,
+        notes: String? = nil,
+        dateAdded: String? = nil,
+        wearCount: Int? = nil,
+        purchaseDate: String? = nil,
+        careInfo: [String]? = nil,
+        condition: ItemCondition? = nil,
+        size: ClothingSize? = nil,
+        aestheticTags: [String]? = nil,
+        draftStatus: DraftStatus? = nil,
+        draftError: String? = nil,
+        userId: String? = nil,
+        estimatedMarketValue: Double? = nil,
+        lastWornAt: String? = nil,
+        wearEvents: [WearEvent]? = nil,
+        draftCreatedAt: String? = nil,
+        draftUpdatedAt: String? = nil
+    ) {
+        self.id = id
+        self.imageUrl = imageUrl
+        self.rawImageBlobUrl = rawImageBlobUrl
+        self.tags = tags
+        self.colours = colours
+        self.brand = brand
+        self.category = category
+        self.price = price
+        self.notes = notes
+        self.dateAdded = dateAdded
+        self.wearCount = wearCount
+        self.purchaseDate = purchaseDate
+        self.careInfo = careInfo
+        self.condition = condition
+        self.size = size
+        self.aestheticTags = aestheticTags
+        self.draftStatus = draftStatus
+        self.draftError = draftError
+        self.userId = userId
+        self.estimatedMarketValue = estimatedMarketValue
+        self.lastWornAt = lastWornAt
+        self.wearEvents = wearEvents ?? []
+        self.draftCreatedAt = draftCreatedAt
+        self.draftUpdatedAt = draftUpdatedAt
+    }
+
     func searchableText() -> String {
         [brand, category, notes]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }

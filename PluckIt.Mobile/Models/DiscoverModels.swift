@@ -171,6 +171,9 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
     let title: String?
     let brand: String?
     let imageUrl: String?
+    let sourceId: String?
+    let sourceType: String?
+    let productUrl: String?
     let source: ScraperSource?
     let detailUrl: String?
     let priceText: String?
@@ -185,6 +188,9 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
         title: String? = nil,
         brand: String? = nil,
         imageUrl: String? = nil,
+        sourceId: String? = nil,
+        sourceType: String? = nil,
+        productUrl: String? = nil,
         source: ScraperSource? = nil,
         detailUrl: String? = nil,
         priceText: String? = nil,
@@ -198,6 +204,9 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
         self.title = title
         self.brand = brand
         self.imageUrl = imageUrl
+        self.sourceId = sourceId
+        self.sourceType = sourceType
+        self.productUrl = productUrl
         self.source = source
         self.detailUrl = detailUrl
         self.priceText = priceText
@@ -206,6 +215,29 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
         self.displayPriceText = displayPriceText
         self.buyLinks = buyLinks
         self.tags = tags
+    }
+
+    func resolvedSourceName(from availableSources: [ScraperSource]) -> String {
+        if let cachedSource = source, !cachedSource.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return cachedSource.name
+        }
+
+        if let sourceId {
+            if let sourceMatch = availableSources.first(where: { $0.id == sourceId }),
+               !sourceMatch.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return sourceMatch.name
+            }
+        }
+
+        if let sourceType, !sourceType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return sourceType
+        }
+
+        if let sourceId, !sourceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return sourceId
+        }
+
+        return "Unknown source"
     }
 }
 
@@ -248,9 +280,10 @@ struct DiscoverFeedResponse: Codable {
 }
 
 struct DiscoverFeedQuery {
-    var page: Int = 1
     var pageSize: Int = 20
     var query: String?
-    var sort: String?
+    var sortBy: String?
+    var sourceIds: [String]?
+    var timeRange: String?
     var continuationToken: String?
 }
