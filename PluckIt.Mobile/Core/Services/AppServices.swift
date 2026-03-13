@@ -16,6 +16,7 @@ final class AppServices: ObservableObject {
     let vaultInsightsService: VaultInsightsService
     let profileService: ProfileService
     let stylistService: StylistService
+    let digestService: DigestService
 
     init(runtimeConfiguration: RuntimeConfiguration) {
         self.runtimeConfiguration = runtimeConfiguration
@@ -46,6 +47,7 @@ final class AppServices: ObservableObject {
         self.vaultInsightsService = VaultInsightsService(client: processorClient)
         self.profileService = ProfileService(client: apiClient)
         self.stylistService = StylistService(client: processorClient)
+        self.digestService = DigestService(client: apiClient)
     }
 
     convenience init() {

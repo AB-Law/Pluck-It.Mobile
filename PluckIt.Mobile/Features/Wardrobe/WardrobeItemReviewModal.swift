@@ -89,13 +89,20 @@ struct WardrobeItemReviewModal: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Metadata") {
+                Section("Details") {
                     TextField("Brand", text: $brand)
-                    Text("Category: \(category.isEmpty ? "—" : category)")
-                    if let selectedCondition = condition.isEmpty ? nil : condition {
-                        Text("Condition: \(selectedCondition)")
-                    } else {
-                        Text("Condition: —")
+                    Picker("Category", selection: $category) {
+                        Text("—").tag("")
+                        ForEach(categories, id: \.self) { category in
+                            Text(category).tag(category)
+                        }
+                    }
+                    .onChange(of: category) { resetSize() }
+                    Picker("Condition", selection: $condition) {
+                        Text("—").tag("")
+                        ForEach(conditions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
                     }
                     HStack {
                         Text(priceCurrency)
@@ -105,7 +112,6 @@ struct WardrobeItemReviewModal: View {
                             .keyboardType(.decimalPad)
                     }
                     TextField("Purchase date", text: $purchaseDate)
-                    Text("Wears: \(wearCount)")
                 }
 
                 Section("Notes") {
@@ -141,19 +147,6 @@ struct WardrobeItemReviewModal: View {
                     }
                 }
 
-                Section("Category") {
-                    Picker("Category", selection: $category) {
-                        Text("—").tag("")
-                        ForEach(categories, id: \.self) { category in
-                            Text(category).tag(category)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: category) {
-                        resetSize()
-                    }
-                }
-
                 if sizeInputType != .none {
                     Section("Size") {
                         sizeSection
@@ -176,44 +169,13 @@ struct WardrobeItemReviewModal: View {
                     }
                 }
 
-                Section("Condition") {
-                    Picker("Condition", selection: $condition) {
-                        Text("—").tag("")
-                        ForEach(conditions, id: \.self) { option in
-                            Text(option).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section {
-                    if isSaving {
-                        HStack {
-                            Spacer()
-                            ProgressView("Saving changes")
-                                .foregroundStyle(PluckTheme.secondaryText)
-                            Spacer()
-                        }
-                    } else {
-                        Button("Save changes") {
-                            Task {
-                                await saveChanges()
-                            }
-                        }
-                        .disabled(isLogging)
-                        .foregroundStyle(PluckTheme.info)
-                    }
-                }
-
                 Section {
                     if isLogging {
                         ProgressView("Logging wear")
                             .foregroundStyle(PluckTheme.secondaryText)
                     } else {
                         Button("Log wear") {
-                            Task {
-                                await logWear()
-                            }
+                            Task { await logWear() }
                         }
                         .foregroundStyle(PluckTheme.primaryText)
                     }
@@ -231,13 +193,20 @@ struct WardrobeItemReviewModal: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
+                    Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundStyle(PluckTheme.secondaryText)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
                         ProgressView()
+                    } else {
+                        Button("Save") {
+                            Task { await saveChanges() }
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(isLogging)
                     }
                 }
             }
@@ -480,12 +449,12 @@ struct WardrobeItemReviewModal: View {
         guard !profileCurrencyLoaded else { return }
         profileCurrencyLoaded = true
         do {
-            let profile = try await appServices.profileService.fetchProfile()
-            let profileCurrency = profile.currencyCode?.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let profileCurrency, !profileCurrency.isEmpty else { return }
-            priceCurrency = profileCurrency.uppercased()
+            let prefs = try await appServices.profileService.fetchPreferences()
+            let currency = prefs.currencyCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !currency.isEmpty else { return }
+            priceCurrency = currency.uppercased()
         } catch {
-            // Keep existing fallback currency when profile fetch is unavailable.
+            // Keep existing fallback currency when preferences fetch is unavailable.
         }
     }
 

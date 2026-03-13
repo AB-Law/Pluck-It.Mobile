@@ -12,6 +12,8 @@ struct WardrobeView: View {
     @State private var selectedItem: ClothingItem?
     @State private var searchText = ""
     @State private var sortMode: WardrobeSortMode = .newest
+    @State private var isUploadPresented = false
+    @State private var pendingDraftCount = 0
 
     private enum WardrobeSortMode: String, CaseIterable {
         case newest = "Newest"
@@ -150,6 +152,47 @@ struct WardrobeView: View {
             .navigationTitle("Wardrobe")
             .navigationBarTitleDisplayMode(.inline)
             .background(PluckTheme.background)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: PluckTheme.Spacing.xs) {
+                        if pendingDraftCount > 0 {
+                            Button {
+                                isUploadPresented = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.caption)
+                                    Text("Review (\(pendingDraftCount))")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(PluckTheme.success.opacity(0.2))
+                                .foregroundStyle(PluckTheme.success)
+                                .clipShape(Capsule())
+                            }
+                        }
+                        Button {
+                            isUploadPresented = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.subheadline)
+                                .foregroundStyle(PluckTheme.primaryText)
+                                .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
+                                .background(PluckTheme.card)
+                                .clipShape(Circle())
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $isUploadPresented) {
+                WardrobeUploadView(onUploaded: {
+                    startLoad(refresh: true)
+                }, onPendingCountChanged: { count in
+                    pendingDraftCount = count
+                })
+                .environmentObject(appServices)
+            }
             .task {
                 if items.isEmpty {
                     await awaitCompletionOfLoad(refresh: true)

@@ -13,6 +13,7 @@ struct DiscoverView: View {
     @State private var activeSourceId: String?
     @State private var sortMode: DiscoverSortMode = .top
     @State private var timeRange: DiscoverTimeRange = .all
+    @State private var selectedItem: ScrapedItem?
 
     private enum DiscoverSortMode: String, CaseIterable {
         case top = "Top"
@@ -143,6 +144,10 @@ struct DiscoverView: View {
                         VStack(spacing: PluckTheme.Spacing.sm) {
                             ForEach(visibleItems) { item in
                                 discoverCard(for: item)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedItem = item
+                                    }
                             }
 
                             if let _ = continuationToken {
@@ -189,6 +194,10 @@ struct DiscoverView: View {
                 await loadFeed(refresh: true)
             }
             .shellToolbar()
+            .sheet(item: $selectedItem) { item in
+                DiscoverItemDetailView(item: item, sources: sources)
+                    .environmentObject(appServices)
+            }
         }
     }
 

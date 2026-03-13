@@ -278,6 +278,43 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
     }
 }
 
+enum UploadState: Equatable {
+    case queued
+    case uploading
+    case processing
+    case ready
+    case failed(String?)
+}
+
+struct UploadQueueItem: Identifiable, Equatable {
+    let id: UUID
+    let imageData: Data
+    var draftId: String?
+    var state: UploadState
+
+    init(imageData: Data) {
+        self.id = UUID()
+        self.imageData = imageData
+        self.draftId = nil
+        self.state = .queued
+    }
+
+    var isProcessing: Bool {
+        if case .processing = state { return true }
+        return false
+    }
+
+    var isReady: Bool {
+        if case .ready = state { return true }
+        return false
+    }
+
+    var isFailed: Bool {
+        if case .failed = state { return true }
+        return false
+    }
+}
+
 struct WardrobeQuery: Codable {
     let page: Int
     let pageSize: Int

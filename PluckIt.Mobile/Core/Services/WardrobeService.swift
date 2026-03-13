@@ -13,7 +13,13 @@ final class WardrobeService {
         continuationToken: String? = nil,
         sortField: String? = nil,
         sortDir: String? = nil,
-        query: String? = nil
+        query: String? = nil,
+        brand: String? = nil,
+        condition: String? = nil,
+        priceMin: Double? = nil,
+        priceMax: Double? = nil,
+        minWears: Int? = nil,
+        category: String? = nil
     ) async throws -> WardrobePagedResponse {
         var params: [String: String] = ["pageSize": String(pageSize)]
         if let continuationToken, !continuationToken.isEmpty {
@@ -22,11 +28,29 @@ final class WardrobeService {
         if let sortField, !sortField.isEmpty { params["sortField"] = sortField }
         if let sortDir, !sortDir.isEmpty { params["sortDir"] = sortDir }
         if let query, !query.isEmpty { params["query"] = query }
+        if let brand, !brand.isEmpty { params["brand"] = brand }
+        if let condition, !condition.isEmpty { params["condition"] = condition }
+        if let priceMin { params["priceMin"] = String(priceMin) }
+        if let priceMax { params["priceMax"] = String(priceMax) }
+        if let minWears { params["minWears"] = String(minWears) }
+        if let category, !category.isEmpty { params["category"] = category }
         return try await client.send(method: "GET", path: basePath, query: params)
     }
 
     func fetchItem(by id: String) async throws -> ClothingItem {
         return try await client.send(method: "GET", path: "\(basePath)/\(id)")
+    }
+
+    func uploadForDraft(imageData: Data) async throws -> ClothingItem {
+        return try await client.uploadMultipart(path: "\(basePath)/upload", imageData: imageData)
+    }
+
+    func retryDraft(_ draftId: String) async throws {
+        try await client.sendVoid(method: "POST", path: "\(basePath)/drafts/\(draftId)/retry")
+    }
+
+    func dismissDraft(_ draftId: String) async throws {
+        try await client.sendVoid(method: "DELETE", path: "\(basePath)/\(draftId)")
     }
 
     func createDraft(from item: ClothingItem) async throws -> ClothingItem {
@@ -41,18 +65,6 @@ final class WardrobeService {
 
     func fetchDrafts() async throws -> [WardrobeUploadDraft] {
         do {
-            let response: [ClothingItem] = try await client.send(method: "GET", path: "\(basePath)/drafts")
-            return response.compactMap { item in
-                let status = (item.draftStatus ?? "queued")
-                return WardrobeUploadDraft(
-                    id: item.id,
-                    status: status,
-                    createdAt: item.draftCreatedAt,
-                    updatedAt: item.draftUpdatedAt,
-                    item: item
-                )
-            }
-        } catch {
             let response: WardrobePagedResponse = try await client.send(method: "GET", path: "\(basePath)/drafts")
             return response.items.map { item in
                 let status = item.draftStatus ?? "queued"
@@ -64,11 +76,13 @@ final class WardrobeService {
                     item: item
                 )
             }
+        } catch {
+            throw error
         }
     }
 
     func acceptDraft(_ draftId: String) async throws {
-        try await client.send(method: "POST", path: "\(basePath)/drafts/\(draftId)/accept")
+        try await client.send(method: "PATCH", path: "\(basePath)/drafts/\(draftId)/accept")
     }
 
     func rejectDraft(_ draftId: String) async throws {

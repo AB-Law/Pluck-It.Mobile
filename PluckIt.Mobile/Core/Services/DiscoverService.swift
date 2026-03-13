@@ -31,4 +31,14 @@ final class DiscoverService {
         let response: ScraperSourcesResponse = try await client.send(method: "GET", path: "\(basePath)/sources")
         return response.sources
     }
+
+    func sendFeedback(itemId: String, signal: String, galleryImageIndex: Int? = nil) async throws {
+        struct FeedbackPayload: Encodable {
+            let signal: String
+            let galleryImageIndex: Int?
+        }
+        let payload = FeedbackPayload(signal: signal, galleryImageIndex: galleryImageIndex)
+        let body = try JSONEncoder().encode(payload)
+        try await client.sendVoid(method: "POST", path: "\(basePath)/items/\(itemId)/feedback", body: body)
+    }
 }

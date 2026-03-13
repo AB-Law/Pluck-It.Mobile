@@ -30,39 +30,8 @@ struct AppRootView: View {
                 .environmentObject(appServices)
         }
         .fullScreenCover(isPresented: $navState.isDigestOpen) {
-            DigestOverlay()
+            DigestPanelView()
                 .environmentObject(appServices)
-        }
-    }
-}
-
-private struct DigestOverlay: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Text("Digest")
-                    .font(.largeTitle)
-                    .fontWeight(.black)
-                    .foregroundStyle(.white)
-                Text("Digest insights from your wardrobe are coming in Phase 2.")
-                    .multilineTextAlignment(.center)
-                Spacer()
-            }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(PluckTheme.background)
-            .navigationTitle("Digest")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .cancel) {
-                        dismiss()
-                    } label: {
-                        Text("Close")
-                    }
-                }
-            }
         }
     }
 }

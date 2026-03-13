@@ -150,6 +150,58 @@ final class APIClient {
         }
     }
 
+    /// Uploads image data as multipart/form-data and decodes the response.
+    func uploadMultipart<T: Decodable>(
+        path: String,
+        imageData: Data,
+        fileName: String = "image.jpg",
+        mimeType: String = "image/jpeg",
+        timeout: TimeInterval = 60
+    ) async throws -> T {
+        let url = buildUrl(path: path, query: [:])
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = timeout
+        request.httpBody = body
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let token = await tokenProvider?() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        logRequest(method: "POST", url: url, headers: request.allHTTPHeaderFields ?? [:], body: nil)
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            let bodyText = String(data: data, encoding: .utf8)
+            logResponse(url: url, statusCode: httpResponse.statusCode, body: bodyText)
+            guard (200 ... 299).contains(httpResponse.statusCode) else {
+                throw ErrorResponse(statusCode: httpResponse.statusCode, body: bodyText, requestURL: url)
+            }
+            do {
+                return try jsonDecoder.decode(T.self, from: data)
+            } catch {
+                logDecodeFailure(type: String(describing: T.self), url: url, body: bodyText, error: error)
+                throw error
+            }
+        } catch {
+            guard !isCancellationError(error) else { throw error }
+            logError(context: "Upload failed for POST \(url.absoluteString)", error: error)
+            throw error
+        }
+    }
+
     func makeStreamingRequest(
         method: String = "POST",
         path: String,

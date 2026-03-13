@@ -182,6 +182,9 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
     let displayPriceText: String?
     let buyLinks: [BuyLink]?
     let tags: [String]?
+    let galleryImages: [String]?
+    let commentText: String?
+    let scoreSignal: Int?
 
     init(
         id: String = "",
@@ -198,7 +201,10 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
         displayDetailUrl: String? = nil,
         displayPriceText: String? = nil,
         buyLinks: [BuyLink]? = nil,
-        tags: [String]? = nil
+        tags: [String]? = nil,
+        galleryImages: [String]? = nil,
+        commentText: String? = nil,
+        scoreSignal: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -215,6 +221,9 @@ struct ScrapedItem: Codable, Equatable, Identifiable {
         self.displayPriceText = displayPriceText
         self.buyLinks = buyLinks
         self.tags = tags
+        self.galleryImages = galleryImages
+        self.commentText = commentText
+        self.scoreSignal = scoreSignal
     }
 
     func resolvedSourceName(from availableSources: [ScraperSource]) -> String {
