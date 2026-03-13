@@ -16,6 +16,17 @@ struct RuntimeConfiguration {
 
     /// Optional mock local user email for local dev display.
     let mockUserEmail: String?
+    let localMockToken: String?
+
+    /// Optional Google OAuth client identifiers for iOS sign in.
+    let googleClientId: String?
+    let googleReversedClientId: String?
+
+    /// Relative backend path for exchanging Google ID token -> app session token.
+    let googleTokenExchangePath: String
+
+    /// Enable mock/local identity even without a real auth token.
+    let useMockAuthFallback: Bool
 
     /// If true, auth headers are intentionally not added to requests.
     let skipAuthHeader: Bool
@@ -37,6 +48,33 @@ struct RuntimeConfiguration {
             Bundle.main.object(forInfoDictionaryKey: key) as? String
         }
 
+        func readGooglePlist(_ key: String) -> String? {
+            guard let url = Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist"),
+                  let data = try? Data(contentsOf: url),
+                  let raw = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+                  let dict = raw as? [String: Any] else {
+                return nil
+            }
+            return dict[key] as? String
+        }
+
+        func normalizeUrl(_ raw: String?) -> String {
+            guard let raw else { return "" }
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return "" }
+
+            if let scheme = URLComponents(string: trimmed)?.scheme, !scheme.isEmpty {
+                return trimmed
+            }
+
+            let normalized = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+            if normalized.hasPrefix("localhost:") || normalized.hasPrefix("127.0.0.1:") {
+                return "http://\(normalized)"
+            }
+
+            return "https://\(normalized)"
+        }
+
         func readBool(_ key: String, defaultValue: Bool) -> Bool {
             let value = readEnv(key) ?? readPlist(key)
             switch value?.lowercased() {
@@ -50,18 +88,35 @@ struct RuntimeConfiguration {
         }
 
         let apiUrlValue = readEnv("PLUCKIT_API_BASE_URL")
+            ?? readEnv("PLUCKIT_API_URL")
             ?? readPlist("PluckItApiBaseURL")
             ?? "http://127.0.0.1:7072"
 
         let processorUrlValue = readEnv("PLUCKIT_PROCESSOR_BASE_URL")
+            ?? readEnv("PLUCKIT_CHAT_API_URL")
             ?? readPlist("PluckItProcessorBaseURL")
             ?? "http://127.0.0.1:7071"
 
-        self.apiBaseUrl = URL(string: apiUrlValue) ?? URL(string: "http://127.0.0.1:7072")!
-        self.processorBaseUrl = URL(string: processorUrlValue) ?? URL(string: "http://127.0.0.1:7071")!
-        self.mockUserId = readEnv("PLUCKIT_MOCK_USER_ID")
-        self.mockUserEmail = readEnv("PLUCKIT_MOCK_USER_EMAIL")
+        self.apiBaseUrl = URL(string: normalizeUrl(apiUrlValue)) ?? URL(string: "http://127.0.0.1:7072")!
+        self.processorBaseUrl = URL(string: normalizeUrl(processorUrlValue)) ?? URL(string: "http://127.0.0.1:7071")!
+        let mockUserId = readEnv("PLUCKIT_MOCK_USER_ID") ?? readEnv("PLUCKIT_LOCAL_USER_ID")
+        let mockUserEmail = readEnv("PLUCKIT_MOCK_USER_EMAIL") ?? readEnv("PLUCKIT_LOCAL_USER_EMAIL")
+        let mockToken = readEnv("PLUCKIT_MOCK_TOKEN") ?? readEnv("PLUCKIT_LOCAL_AUTH_TOKEN")
+        self.mockUserId = mockUserId
+        self.mockUserEmail = mockUserEmail
+        self.localMockToken = mockToken
         self.skipAuthHeader = readBool("PLUCKIT_SKIP_AUTH_HEADER", defaultValue: false)
+        self.useMockAuthFallback = readBool(
+            "PLUCKIT_USE_MOCK_AUTH_FALLBACK",
+            defaultValue: self.skipAuthHeader || mockUserId != nil || mockUserEmail != nil || mockToken != nil
+        )
+        self.googleClientId = readEnv("PLUCKIT_GOOGLE_CLIENT_ID")
+            ?? readEnv("GOOGLE_CLIENT_ID")
+            ?? readGooglePlist("CLIENT_ID")
+        self.googleReversedClientId = readEnv("PLUCKIT_GOOGLE_REVERSED_CLIENT_ID")
+            ?? readEnv("GOOGLE_REVERSED_CLIENT_ID")
+            ?? readGooglePlist("REVERSED_CLIENT_ID")
+        self.googleTokenExchangePath = readEnv("PLUCKIT_TOKEN_RELAY_PATH") ?? "/api/auth/mobile-token"
         self.networkDebugEnabled = readBool("PLUCKIT_NETWORK_DEBUG", defaultValue: true)
     }
 }

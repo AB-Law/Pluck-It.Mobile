@@ -3,10 +3,12 @@ import SwiftUI
 struct VaultFilters: Equatable {
     var group: VaultSmartGroup = .all
     var priceMin: Double = 0
-    var priceMax: Double = 2000
+    var priceMax: Double = 5000
     var minWears: Int = 0
     var brand: String = ""
     var condition: String = ""
+    var sortField: String = "dateAdded"
+    var sortDir: String = "desc"
 
     var isDefault: Bool {
         self == VaultFilters()
@@ -19,6 +21,21 @@ enum VaultSmartGroup: String, CaseIterable {
     case recentlyWorn = "Recently Worn"
 }
 
+private struct SortOption: Equatable, Hashable {
+    let label: String
+    let field: String
+    let dir: String
+}
+
+private let sortOptions: [SortOption] = [
+    SortOption(label: "Newest First",       field: "dateAdded",    dir: "desc"),
+    SortOption(label: "Oldest First",       field: "dateAdded",    dir: "asc"),
+    SortOption(label: "Most Worn",          field: "wearCount",    dir: "desc"),
+    SortOption(label: "Least Worn",         field: "wearCount",    dir: "asc"),
+    SortOption(label: "Price: High to Low", field: "price.amount", dir: "desc"),
+    SortOption(label: "Price: Low to High", field: "price.amount", dir: "asc"),
+]
+
 struct VaultFilterSidebarView: View {
     @Binding var filters: VaultFilters
     let onApply: () -> Void
@@ -26,12 +43,17 @@ struct VaultFilterSidebarView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: VaultFilters
 
-    private let conditions = ["", "New", "Excellent", "Good", "Fair", "Poor"]
+    private let conditions = ["New", "Excellent", "Good", "Fair"]
 
     init(filters: Binding<VaultFilters>, onApply: @escaping () -> Void) {
         self._filters = filters
         self.onApply = onApply
         self._draft = State(initialValue: filters.wrappedValue)
+    }
+
+    private var selectedSortOption: SortOption {
+        sortOptions.first { $0.field == draft.sortField && $0.dir == draft.sortDir }
+            ?? sortOptions[0]
     }
 
     var body: some View {
@@ -44,6 +66,21 @@ struct VaultFilterSidebarView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section("Sort By") {
+                    Picker("Sort", selection: Binding(
+                        get: { selectedSortOption },
+                        set: { opt in
+                            draft.sortField = opt.field
+                            draft.sortDir = opt.dir
+                        }
+                    )) {
+                        ForEach(sortOptions, id: \.label) { opt in
+                            Text(opt.label).tag(opt)
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 Section("Price Range") {
@@ -84,7 +121,7 @@ struct VaultFilterSidebarView: View {
                 Section("Condition") {
                     Picker("Condition", selection: $draft.condition) {
                         Text("Any").tag("")
-                        ForEach(conditions.dropFirst(), id: \.self) { cond in
+                        ForEach(conditions, id: \.self) { cond in
                             Text(cond).tag(cond)
                         }
                     }

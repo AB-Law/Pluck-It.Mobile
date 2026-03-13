@@ -202,6 +202,7 @@ struct DigestPanelView: View {
         do {
             let result = try await appServices.digestService.fetchLatest()
             digest = result
+            guard let result else { return }
             rationaleOpen = Array(repeating: false, count: result.suggestions.count)
             feedbackSent = Array(repeating: nil, count: result.suggestions.count)
             // Restore prior feedback

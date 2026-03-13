@@ -77,6 +77,11 @@ struct ProfileOverlay: View {
                         ? "Local mock session"
                         : "Token-backed session"
                 )
+                Button("Sign out") {
+                    appServices.authService.signOut()
+                }
+                .font(.footnote)
+                .foregroundStyle(PluckTheme.danger)
             }
 
             sectionCard("Server Profile") {

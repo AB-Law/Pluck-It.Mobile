@@ -46,3 +46,12 @@ struct DigestFeedbackItem: Codable {
     let suggestionIndex: Int
     let signal: String
 }
+
+// Processor response wrappers
+struct DigestLatestResponse: Codable {
+    let digest: WardrobeDigest?
+}
+
+struct DigestFeedbackListResponse: Codable {
+    let feedback: [DigestFeedbackItem]
+}

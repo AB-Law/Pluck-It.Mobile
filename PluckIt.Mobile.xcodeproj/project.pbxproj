@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		FA50EB242F643F8500EAC905 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = FA50EB232F643F8500EAC905 /* GoogleSignIn */; };
+		FA50EB262F643F8500EAC905 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FA50EB252F643F8500EAC905 /* GoogleSignInSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		FA50EA582F63FC0200EAC905 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +34,22 @@
 		FA50EA612F63FC0200EAC905 /* PluckIt.MobileUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluckIt.MobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		FA50EB2C2F6440DD00EAC905 /* Exceptions for "PluckIt.Mobile" folder in "PluckIt.Mobile" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"PluckIt-Mobile-Info.plist",
+			);
+			target = FA50EA472F63FC0000EAC905 /* PluckIt.Mobile */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		FA50EA4A2F63FC0000EAC905 /* PluckIt.Mobile */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				FA50EB2C2F6440DD00EAC905 /* Exceptions for "PluckIt.Mobile" folder in "PluckIt.Mobile" target */,
+			);
 			path = PluckIt.Mobile;
 			sourceTree = "<group>";
 		};
@@ -52,6 +70,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA50EB242F643F8500EAC905 /* GoogleSignIn in Frameworks */,
+				FA50EB262F643F8500EAC905 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +132,8 @@
 			);
 			name = PluckIt.Mobile;
 			packageProductDependencies = (
+				FA50EB232F643F8500EAC905 /* GoogleSignIn */,
+				FA50EB252F643F8500EAC905 /* GoogleSignInSwift */,
 			);
 			productName = PluckIt.Mobile;
 			productReference = FA50EA482F63FC0000EAC905 /* PluckIt.Mobile.app */;
@@ -195,6 +217,9 @@
 			);
 			mainGroup = FA50EA3F2F63FC0000EAC905;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FA50EB222F643F8500EAC905 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FA50EA492F63FC0000EAC905 /* Products */;
 			projectDirPath = "";
@@ -400,6 +425,7 @@
 				DEVELOPMENT_TEAM = FTY8CR8DA3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PluckIt-Mobile-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -432,6 +458,7 @@
 				DEVELOPMENT_TEAM = FTY8CR8DA3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PluckIt-Mobile-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -578,6 +605,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FA50EB222F643F8500EAC905 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FA50EB232F643F8500EAC905 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA50EB222F643F8500EAC905 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		FA50EB252F643F8500EAC905 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA50EB222F643F8500EAC905 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FA50EA402F63FC0000EAC905 /* Project object */;
 }

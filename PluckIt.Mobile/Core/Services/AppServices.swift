@@ -4,9 +4,11 @@ import Combine
 @MainActor
 final class AppServices: ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
+    private var cancellables: Set<AnyCancellable> = []
 
     let runtimeConfiguration: RuntimeConfiguration
     let authService: AuthService
+    let tokenExchangeClient: APIClient
     let apiClient: APIClient
     let processorClient: APIClient
     let networkMonitor: NetworkMonitor
@@ -22,7 +24,14 @@ final class AppServices: ObservableObject {
         self.runtimeConfiguration = runtimeConfiguration
         self.networkMonitor = NetworkMonitor()
         let debugEnabled = runtimeConfiguration.networkDebugEnabled
-        self.authService = AuthService(runtimeConfiguration: runtimeConfiguration)
+        self.tokenExchangeClient = APIClient(
+            baseUrl: runtimeConfiguration.apiBaseUrl,
+            debugLoggingEnabled: debugEnabled
+        )
+        self.authService = AuthService(
+            runtimeConfiguration: runtimeConfiguration,
+            tokenExchangeClient: tokenExchangeClient
+        )
         self.authService.bootstrap()
         let authService = self.authService
 
@@ -47,7 +56,14 @@ final class AppServices: ObservableObject {
         self.vaultInsightsService = VaultInsightsService(client: processorClient)
         self.profileService = ProfileService(client: apiClient)
         self.stylistService = StylistService(client: processorClient)
-        self.digestService = DigestService(client: apiClient)
+        self.digestService = DigestService(client: processorClient)
+
+        self.authService.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     convenience init() {

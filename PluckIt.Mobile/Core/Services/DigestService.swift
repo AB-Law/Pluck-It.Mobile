@@ -8,17 +8,18 @@ final class DigestService {
         self.client = client
     }
 
-    func fetchLatest() async throws -> WardrobeDigest {
-        return try await client.send(method: "GET", path: "\(basePath)/latest")
+    func fetchLatest() async throws -> WardrobeDigest? {
+        let wrapper: DigestLatestResponse = try await client.send(method: "GET", path: "\(basePath)/latest")
+        return wrapper.digest
     }
 
     func fetchFeedback(digestId: String) async throws -> [DigestFeedbackItem] {
-        let response: [DigestFeedbackItem] = try await client.send(
+        let wrapper: DigestFeedbackListResponse = try await client.send(
             method: "GET",
             path: "\(basePath)/feedback",
             query: ["digestId": digestId]
         )
-        return response
+        return wrapper.feedback
     }
 
     func sendFeedback(_ body: DigestFeedbackRequest) async throws {

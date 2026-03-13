@@ -77,7 +77,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "PLUCKIT_USE_LOCAL_BACKEND"
-            value = "true"
+            value = "false"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -92,37 +92,47 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_SKIP_AUTH_HEADER"
-            value = "true"
+            value = "false"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_USE_MOCK_AUTH_FALLBACK"
-            value = "true"
+            value = "false"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_LOCAL_USER_ID"
-            value = "local-dev-user"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_LOCAL_USER_EMAIL"
-            value = "dev@local.test"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_LOCAL_USER_NAME"
-            value = "Local Dev"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_LOCAL_AUTH_TOKEN"
-            value = "local-dev-token"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "PLUCKIT_TOKEN_RELAY_PATH"
             value = "/api/auth/mobile-token"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "PLUCKIT_API_BASE_URL"
+            value = "https://pluckit-prod-api-func.azurewebsites.net"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "PLUCKIT_PROCESSOR_BASE_URL"
+            value = "https://pluckit-prod-processor-func.azurewebsites.net"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>

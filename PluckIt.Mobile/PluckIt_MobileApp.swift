@@ -15,7 +15,7 @@ struct PluckIt_MobileApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppRootView()
+            ContentView()
                 .environmentObject(appServices)
                 .environmentObject(navState)
                 .environmentObject(appServices.authService)

@@ -32,8 +32,6 @@ struct VaultView: View {
             Group {
                 if insightsLoading && !hasInsightData && items.isEmpty {
                     stateLoadingView()
-                } else if let err = insightsError, !hasInsightData {
-                    stateErrorView(errorText: err)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: PluckTheme.Spacing.md) {
@@ -231,23 +229,34 @@ struct VaultView: View {
 
     // MARK: - Stats / Insights (unchanged layout)
 
+    private var computedTotalItems: Int { insights?.cpwIntel?.count ?? 0 }
+
+    private var computedAverageCpw: Double? {
+        guard let intel = insights?.cpwIntel, !intel.isEmpty else { return nil }
+        let values = intel.compactMap { $0.cpw }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
     private func statsCards(for insights: VaultInsightsResponse) -> some View {
         HStack(alignment: .top, spacing: PluckTheme.Spacing.sm) {
             VaultStatCard(
-                title: "Total archive items",
-                value: formattedInt(insights.totalItems),
+                title: "Archive items",
+                value: formattedInt(computedTotalItems),
                 accent: PluckTheme.accent
             )
             VaultStatCard(
                 title: "Average CPW",
-                value: formattedCurrency(insights.cpw),
+                value: formattedCurrency(computedAverageCpw),
                 accent: PluckTheme.success
             )
-            VaultStatCard(
-                title: "Est. value",
-                value: formattedCurrency(insights.totalMarketValue),
-                accent: PluckTheme.info
-            )
+            if let unworn = insights.behavioralInsights?.unworn90dPct {
+                VaultStatCard(
+                    title: "Unworn 90d",
+                    value: String(format: "%.0f%%", unworn),
+                    accent: PluckTheme.info
+                )
+            }
         }
         .padding(.horizontal, PluckTheme.Spacing.md)
     }
@@ -262,28 +271,31 @@ struct VaultView: View {
                 .fill(PluckTheme.card)
                 .overlay {
                     VStack(alignment: .leading, spacing: PluckTheme.Spacing.sm) {
-                        if let count = insights.totalItems, count > 0 {
+                        let bi = insights.behavioralInsights
+                        if insights.insufficientData == true || bi?.sparseHistory == true {
+                            Text("Add wear data to unlock behavioral insights.")
+                                .font(.caption)
+                                .foregroundStyle(PluckTheme.secondaryText)
+                        } else {
                             LabeledMetric(
                                 title: "Portfolio density",
-                                value: "\(count) tracked entries",
+                                value: "\(computedTotalItems) tracked entries",
                                 accent: .secondary
                             )
-                            LabeledMetric(
-                                title: "Average item frequency",
-                                value: "\(insights.averageItemCount ?? 0) wears",
-                                accent: .secondary
-                            )
-                            if let avg = insights.cpw {
+                            if let color = bi?.topColorWearShare {
                                 LabeledMetric(
-                                    title: "Cost-per-wear trend",
+                                    title: "Most worn color",
+                                    value: "\(color.color.capitalized) (\(String(format: "%.0f", color.pct))%)",
+                                    accent: .secondary
+                                )
+                            }
+                            if let avg = computedAverageCpw {
+                                LabeledMetric(
+                                    title: "Average CPW",
                                     value: formattedCurrency(avg),
                                     accent: .secondary
                                 )
                             }
-                        } else {
-                            Text("Add wear data to unlock behavioral insights.")
-                                .font(.caption)
-                                .foregroundStyle(PluckTheme.secondaryText)
                         }
                     }
                     .padding(PluckTheme.Spacing.md)
@@ -298,11 +310,15 @@ struct VaultView: View {
 
     @ViewBuilder
     private func cpwSignalsList(for insights: VaultInsightsResponse) -> some View {
-        let rows = insights.cpwItems ?? []
-        let sorted = rows.compactMap { row -> (String, Double)? in
-            guard let key = row.key, let value = row.value else { return nil }
-            return (key, value)
-        }
+        let intel = insights.cpwIntel ?? []
+        let sorted = intel
+            .compactMap { entry -> (String, Double)? in
+                guard let cpw = entry.cpw, let itemId = entry.itemId else { return nil }
+                let item = items.first(where: { $0.id == itemId })
+                let name = [item?.brand, item?.category].compactMap { $0 }.joined(separator: " · ")
+                return (name.isEmpty ? itemId : name, cpw)
+            }
+            .sorted { $0.1 > $1.1 }
 
         if sorted.isEmpty {
             Text("CPW signals are not available yet.")
@@ -443,6 +459,8 @@ struct VaultView: View {
             let response = try await appServices.wardrobeService.fetchItems(
                 pageSize: 30,
                 continuationToken: token,
+                sortField: filters.sortField,
+                sortDir: filters.sortDir,
                 brand: brand,
                 condition: condition,
                 priceMin: priceMin,
