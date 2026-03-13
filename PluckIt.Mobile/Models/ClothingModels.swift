@@ -164,6 +164,61 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
     let draftCreatedAt: String?
     let draftUpdatedAt: String?
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case imageUrl
+        case rawImageBlobUrl
+        case tags
+        case colours
+        case brand
+        case category
+        case price
+        case notes
+        case dateAdded
+        case wearCount
+        case purchaseDate
+        case careInfo
+        case condition
+        case size
+        case aestheticTags
+        case draftStatus
+        case draftError
+        case userId
+        case estimatedMarketValue
+        case lastWornAt
+        case wearEvents
+        case draftCreatedAt
+        case draftUpdatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        rawImageBlobUrl = try container.decodeIfPresent(String.self, forKey: .rawImageBlobUrl)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags)
+        colours = try container.decodeIfPresent([ClothingColour].self, forKey: .colours)
+        brand = try container.decodeIfPresent(String.self, forKey: .brand)
+        category = try container.decodeIfPresent(String.self, forKey: .category)
+        price = try container.decodeIfPresent(ClothingPrice.self, forKey: .price)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        dateAdded = try container.decodeIfPresent(String.self, forKey: .dateAdded)
+        wearCount = try container.decodeIfPresent(Int.self, forKey: .wearCount)
+        purchaseDate = try container.decodeIfPresent(String.self, forKey: .purchaseDate)
+        careInfo = try container.decodeIfPresent([String].self, forKey: .careInfo)
+        condition = try container.decodeIfPresent(ItemCondition.self, forKey: .condition)
+        size = try container.decodeIfPresent(ClothingSize.self, forKey: .size)
+        aestheticTags = try container.decodeIfPresent([String].self, forKey: .aestheticTags)
+        draftStatus = try container.decodeIfPresent(DraftStatus.self, forKey: .draftStatus)
+        draftError = try container.decodeIfPresent(String.self, forKey: .draftError)
+        userId = try container.decodeIfPresent(String.self, forKey: .userId)
+        estimatedMarketValue = try container.decodeIfPresent(Double.self, forKey: .estimatedMarketValue)
+        lastWornAt = try container.decodeIfPresent(String.self, forKey: .lastWornAt)
+        wearEvents = try container.decodeIfPresent([WearEvent].self, forKey: .wearEvents) ?? []
+        draftCreatedAt = try container.decodeIfPresent(String.self, forKey: .draftCreatedAt)
+        draftUpdatedAt = try container.decodeIfPresent(String.self, forKey: .draftUpdatedAt)
+    }
+
     func searchableText() -> String {
         [brand, category, notes]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }

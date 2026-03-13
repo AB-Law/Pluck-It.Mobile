@@ -10,34 +10,57 @@ struct WardrobeItemReviewModal: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Item") {
-                    Text("Brand: \(item.brand ?? "—")")
-                    Text("Category: \(item.category ?? "—")")
-                    Text("Condition: \(item.condition ?? "—")")
+                Section("Metadata") {
+                    Text("Brand: \(fallbackText(item.brand))")
+                    Text("Category: \(fallbackText(item.category))")
+                    Text("Condition: \(fallbackText(item.condition))")
+                    if let price = item.price?.amount {
+                        Text("Estimated price: \(String(format: "%.2f", price))")
+                    }
+                    Text("Wears: \(item.wearCount ?? 0)")
                 }
+
+                Section("Item") {
+                    if let notes = item.notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Notes")
+                        Text(notes)
+                            .font(.caption)
+                            .foregroundStyle(PluckTheme.secondaryText)
+                    }
+                    if let size = item.size?.letter, !size.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Size: \(size)")
+                    }
+                }
+
                 if let tags = item.tags, !tags.isEmpty {
                     Section("Tags") {
                         Text(tags.joined(separator: ", "))
                     }
                 }
-                if isLogging {
-                    ProgressView("Updating wear")
-                } else {
-                    Button("Log wear") {
-                        Task {
-                            await logWear()
+
+                Section {
+                    if isLogging {
+                        ProgressView("Updating wear")
+                    } else {
+                        Button("Log wear") {
+                            Task {
+                                await logWear()
+                            }
                         }
+                        .foregroundStyle(PluckTheme.primaryText)
                     }
                 }
+
                 if let errorText {
                     Section {
                         Text(errorText)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(PluckTheme.danger)
                             .font(.caption)
                     }
                 }
             }
             .navigationTitle(item.brand ?? "Item")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {

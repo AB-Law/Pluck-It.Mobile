@@ -6,76 +6,290 @@ struct VaultView: View {
     @State private var loading = false
     @State private var errorText: String?
 
+    private var hasData: Bool {
+        insights != nil
+    }
+
     var body: some View {
         NavigationStack {
             Group {
-                if loading && insights == nil {
-                    ProgressView("Loading vault")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if loading && !hasData {
+                    stateLoadingView()
                 } else if let errorText {
-                    VStack(spacing: 12) {
-                        Text("Vault request failed")
-                            .foregroundStyle(.red)
-                        Text(errorText)
-                            .foregroundStyle(PluckTheme.muted)
-                            .font(.caption)
-                        Button("Retry") {
-                            Task { await loadInsights() }
-                        }
-                    }
-                    .padding()
+                    stateErrorView(errorText: errorText)
                 } else if let insights {
-                    List {
-                        Section("Summary") {
-                            Text("Total Items: \(insights.totalItems ?? 0)")
-                            Text("CPW: \(insights.cpw.map { String(format: "%.2f", $0) } ?? "—")")
-                            Text("Average: \(insights.averageItemCount ?? 0)")
-                            Text("Market value: \(insights.totalMarketValue.map { String(format: "%.2f", $0) } ?? "—")")
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: PluckTheme.Spacing.md) {
+                            statsCards(for: insights)
+                            insightsPanel(for: insights)
+                            Divider()
+                                .padding(.horizontal, PluckTheme.Spacing.xxs)
+                            Text("CPW signals")
+                                .font(.subheadline)
+                                .foregroundStyle(PluckTheme.secondaryText)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, PluckTheme.Spacing.md)
+                            cpwSignalsList(for: insights)
+                            Spacer(minLength: PluckTheme.Spacing.md)
                         }
-                        if let items = insights.cpwItems {
-                            Section("Signals") {
-                                ForEach(items.compactMap { $0.key }, id: \.self) { key in
-                                    if let item = items.first(where: { $0.key == key }) {
-                                        HStack {
-                                            Text(key)
-                                            Spacer()
-                                            Text(item.value.map { String(format: "%.2f", $0) } ?? "—")
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        .padding(.vertical, PluckTheme.Spacing.sm)
                     }
-                    .listStyle(.insetGrouped)
                 } else {
                     Text("No vault insight payload yet")
-                        .foregroundStyle(PluckTheme.muted)
+                        .foregroundStyle(PluckTheme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle("Vault")
-            .task { await loadInsights() }
-            .refreshable { await loadInsights() }
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         Task { await loadInsights() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
+                            .foregroundStyle(PluckTheme.primaryText)
                     }
                 }
+            }
+            .task {
+                await loadInsights()
+            }
+            .refreshable {
+                await loadInsights()
             }
         }
     }
 
+    private func statsCards(for insights: VaultInsightsResponse) -> some View {
+        HStack(alignment: .top, spacing: PluckTheme.Spacing.sm) {
+            VaultStatCard(
+                title: "Total archive items",
+                value: formattedInt(insights.totalItems),
+                accent: PluckTheme.accent
+            )
+
+            VaultStatCard(
+                title: "Average CPW",
+                value: formattedCurrency(insights.cpw),
+                accent: PluckTheme.success
+            )
+
+            VaultStatCard(
+                title: "Est. value",
+                value: formattedCurrency(insights.totalMarketValue),
+                accent: PluckTheme.info
+            )
+        }
+        .padding(.horizontal, PluckTheme.Spacing.md)
+    }
+
+    private func insightsPanel(for insights: VaultInsightsResponse) -> some View {
+        VStack(alignment: .leading, spacing: PluckTheme.Spacing.sm) {
+            Text("Smart Insights")
+                .font(.subheadline)
+                .foregroundStyle(PluckTheme.secondaryText)
+
+            RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                .fill(PluckTheme.card)
+                .overlay {
+                    VStack(alignment: .leading, spacing: PluckTheme.Spacing.sm) {
+                        if let count = insights.totalItems, count > 0 {
+                            LabeledMetric(
+                                title: "Portfolio density",
+                                value: "\(count) tracked entries",
+                                accent: .secondary
+                            )
+
+                            LabeledMetric(
+                                title: "Average item frequency",
+                                value: "\(insights.averageItemCount ?? 0) wears",
+                                accent: .secondary
+                            )
+
+                            if let avg = insights.cpw {
+                                LabeledMetric(
+                                    title: "Cost-per-wear trend",
+                                    value: formattedCurrency(avg),
+                                    accent: .secondary
+                                )
+                            }
+                        } else {
+                            Text("Add wear data to unlock behavioral insights.")
+                                .font(.caption)
+                                .foregroundStyle(PluckTheme.secondaryText)
+                        }
+                    }
+                    .padding(PluckTheme.Spacing.md)
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                        .strokeBorder(PluckTheme.border, lineWidth: 1)
+                )
+        }
+        .padding(.horizontal, PluckTheme.Spacing.md)
+    }
+
+    @ViewBuilder
+    private func cpwSignalsList(for insights: VaultInsightsResponse) -> some View {
+        let rows = insights.cpwItems ?? []
+        let sorted = rows.compactMap { row -> (String, Double)? in
+            guard let key = row.key, let value = row.value else { return nil }
+            return (key, value)
+        }
+
+    if sorted.isEmpty {
+        VStack {
+            Text("CPW signals are not available yet.")
+                .font(.caption)
+                .foregroundStyle(PluckTheme.secondaryText)
+                .padding(.horizontal, PluckTheme.Spacing.md)
+        }
+    } else {
+        VStack(spacing: PluckTheme.Spacing.xs) {
+            ForEach(Array(sorted.prefix(10).indices), id: \.self) { idx in
+                let pair = sorted[idx]
+                HStack {
+                    Text("\(idx + 1). \(pair.0)")
+                        .font(.caption)
+                        .foregroundStyle(PluckTheme.secondaryText)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(formattedCurrency(pair.1))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(PluckTheme.primaryText)
+                        .padding(.horizontal, PluckTheme.Spacing.sm)
+                        .padding(.vertical, 4)
+                        .background(PluckTheme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+                }
+                .padding(.horizontal, PluckTheme.Spacing.md)
+                .padding(.vertical, PluckTheme.Spacing.xs)
+            }
+        }
+        }
+    }
+
+    private func stateLoadingView() -> some View {
+        VStack(spacing: PluckTheme.Spacing.sm) {
+            ProgressView("Loading vault")
+                .foregroundStyle(PluckTheme.secondaryText)
+
+            VStack(spacing: PluckTheme.Spacing.sm) {
+                HStack {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                            .fill(PluckTheme.card)
+                            .frame(height: 84)
+                            .overlay(ProgressView().tint(PluckTheme.primaryText))
+                    }
+                }
+                ForEach(0..<4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
+                        .fill(PluckTheme.card)
+                        .frame(height: 58)
+                        .overlay(ProgressView().tint(PluckTheme.primaryText))
+                }
+            }
+            .padding(.horizontal, PluckTheme.Spacing.md)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func stateErrorView(errorText: String) -> some View {
+        VStack(spacing: PluckTheme.Spacing.sm) {
+            Text("Vault request failed")
+                .foregroundStyle(PluckTheme.danger)
+                .font(.headline)
+            Text(errorText)
+                .foregroundStyle(PluckTheme.secondaryText)
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, PluckTheme.Spacing.md)
+
+            Button("Retry") {
+                Task { await loadInsights() }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func formattedInt(_ value: Int?) -> String {
+        let fallback = "0"
+        guard let value else { return fallback }
+        return NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+    }
+
+    private func formattedCurrency(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "—"
+    }
+
     private func loadInsights() async {
         loading = true
-        errorText = nil
         do {
             insights = try await appServices.vaultInsightsService.fetchInsights()
+            errorText = nil
         } catch {
             errorText = String(describing: error)
         }
         loading = false
+    }
+}
+
+private struct VaultStatCard: View {
+    let title: String
+    let value: String
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PluckTheme.Spacing.xs) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(PluckTheme.secondaryText)
+            Text(value)
+                .font(.headline)
+                .foregroundStyle(PluckTheme.primaryText)
+            Rectangle()
+                .fill(accent)
+                .frame(height: 2)
+                .opacity(0.75)
+                .clipShape(RoundedRectangle(cornerRadius: 1))
+        }
+        .padding(PluckTheme.Spacing.sm)
+        .frame(maxWidth: .infinity)
+        .background(PluckTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
+    }
+}
+
+private struct LabeledMetric: View {
+    let title: String
+    let value: String
+    let accent: Color
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(PluckTheme.secondaryText)
+                    .textCase(.uppercase)
+                Text(value)
+                    .foregroundStyle(PluckTheme.primaryText)
+                    .font(.subheadline)
+            }
+            Spacer()
+            Circle()
+                .fill(accent)
+                .frame(width: 8, height: 8)
+        }
     }
 }

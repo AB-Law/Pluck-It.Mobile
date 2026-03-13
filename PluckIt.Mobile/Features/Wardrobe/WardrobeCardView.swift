@@ -20,6 +20,10 @@ struct WardrobeCardView: View {
         return "0"
     }
 
+    private var wearCountLabel: String {
+        "\(wearCountText) wear" + (item.wearCount == 1 ? "" : "s")
+    }
+
     private var displayImageURL: URL? {
         if let imageUrl = item.imageUrl, let url = normalizedImageURL(imageUrl) {
             return url
@@ -27,57 +31,74 @@ struct WardrobeCardView: View {
         return normalizedImageURL(item.rawImageBlobUrl)
     }
 
+    private var shortTags: String {
+        guard let tags = item.tags, !tags.isEmpty else { return "No tags" }
+        if tags.count <= 2 {
+            return tags.joined(separator: ", ")
+        }
+        return "\(tags.prefix(2).joined(separator: ", ")) +"
+    }
+
+    private var statusLine: String {
+        [displayCategory, wearCountLabel]
+            .joined(separator: " · ")
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: PluckTheme.Spacing.md) {
             AsyncImage(url: displayImageURL) { phase in
                 switch phase {
                 case .empty:
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
                         .fill(PluckTheme.card)
                         .overlay {
                             ProgressView()
+                                .tint(PluckTheme.primaryText)
                         }
-                        .frame(width: 88, height: 88)
+                        .frame(width: 92, height: 92)
                 case .success(let image):
                     image
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 88, height: 88)
+                        .frame(width: 92, height: 92)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.small))
                 case .failure:
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: PluckTheme.Radius.small)
                         .fill(PluckTheme.card)
                         .overlay {
-                            Image(systemName: "photo")
-                                .foregroundStyle(.secondary)
+                            VStack(spacing: PluckTheme.Spacing.xs) {
+                                Image(systemName: "photo")
+                                Text("No image")
+                            }
+                            .foregroundStyle(PluckTheme.secondaryText)
+                            .font(.caption2)
                         }
-                        .frame(width: 88, height: 88)
+                        .frame(width: 92, height: 92)
                 @unknown default:
                     EmptyView()
                 }
             }
+
             VStack(alignment: .leading, spacing: 6) {
                 Text(displayTitle)
-                    .font(.headline)
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(PluckTheme.title)
                     .lineLimit(1)
-                Text(displayCategory)
-                    .font(.subheadline)
-                    .foregroundStyle(PluckTheme.muted)
-                    .lineLimit(1)
-                Text("Worn: \(wearCountText)")
+
+                Text(statusLine)
                     .font(.caption)
-                    .foregroundStyle(PluckTheme.muted)
-                if let tags = item.tags, !tags.isEmpty {
-                    Text(tags.joined(separator: ", "))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                    .foregroundStyle(PluckTheme.secondaryText)
+                    .lineLimit(1)
+
+                Text(shortTags)
+                    .font(.caption)
+                    .foregroundStyle(item.tags?.isEmpty == false ? PluckTheme.secondaryText : PluckTheme.mutedText)
+                    .lineLimit(1)
             }
+            .padding(.vertical, PluckTheme.Spacing.xxs)
             Spacer()
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, PluckTheme.Spacing.sm)
     }
 }

@@ -379,11 +379,6 @@ struct StylistSSEParser {
             return []
         }
 
-        let events = decodeEvents(from: payload)
-        if !events.isEmpty {
-            return events
-        }
-
         dataChunks.append(payload)
         return []
     }

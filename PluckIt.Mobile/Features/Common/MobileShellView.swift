@@ -41,24 +41,34 @@ struct MobileShellView: View {
         .toolbarBackground(PluckTheme.background, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .accentColor(PluckTheme.accent)
-        .navigationTitle("PluckIt")
+        .toolbarBackground(PluckTheme.background, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .background(PluckTheme.background)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
+                shellBarButton(systemName: "person.circle") {
                     navState.isProfileOpen = true
-                } label: {
-                    Image(systemName: "person.circle")
                 }
             }
             ToolbarItem(placement: .navigationBarLeading) {
-                Button {
+                shellBarButton(systemName: "chart.bar") {
                     navState.isDigestOpen = true
-                } label: {
-                    Image(systemName: "chart.bar")
                 }
             }
         }
         .preferredColorScheme(.dark)
         .environment(\.colorScheme, .dark)
+    }
+
+    private func shellBarButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.subheadline)
+                .foregroundStyle(PluckTheme.primaryText)
+                .frame(width: PluckTheme.Control.rowHeight, height: PluckTheme.Control.rowHeight)
+                .background(PluckTheme.card)
+                .clipShape(Circle())
+        }
     }
 }

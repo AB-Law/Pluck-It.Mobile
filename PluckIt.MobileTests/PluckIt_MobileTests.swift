@@ -153,14 +153,20 @@ struct PluckIt_MobileTests {
         events += parser.consume(line: "data: {\"type\":\"done\"}")
         events += parser.consume(line: "")
         #expect(events.count == 1)
-        guard case .done = events.first! else {
+        guard case .done(_, _, _, _, _) = events.first! else {
             #expect(Bool(false), "Expected done event")
             return
         }
     }
 
     @Test func stylistChatEventFallbacksTraceIdFromRequest() throws {
-        let event = StylistChatEvent.done(nil, nil, nil, nil, nil)
+        let event = StylistChatEvent.done(
+            traceId: nil,
+            runId: nil,
+            model: nil,
+            tokenCount: nil,
+            toolLatencyMs: nil
+        )
             .withDefaultTraceId("trace-fallback")
         switch event {
         case let .done(traceId, _, _, _, _):
@@ -182,7 +188,13 @@ struct PluckIt_MobileTests {
 
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
-        let data = try #require(encoder.encode(request))
+        let data: Data
+        do {
+            data = try encoder.encode(request)
+        } catch {
+            Issue.record("Failed to encode StylistChatRequest: \(error)")
+            return
+        }
         let raw = try #require(JSONSerialization.jsonObject(with: data, options: [] ) as? [String: Any])
 
         #expect(raw["message"] as? String == "Find me a blue jacket")
