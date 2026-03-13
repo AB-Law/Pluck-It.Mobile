@@ -10,23 +10,16 @@ import SwiftData
 
 @main
 struct PluckIt_MobileApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @StateObject private var appServices = AppServices()
+    @StateObject private var navState = MobileNavState()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRootView()
+                .environmentObject(appServices)
+                .environmentObject(navState)
+                .environmentObject(appServices.authService)
+                .environmentObject(appServices.networkMonitor)
         }
-        .modelContainer(sharedModelContainer)
     }
 }
