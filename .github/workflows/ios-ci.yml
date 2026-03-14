@@ -67,9 +67,9 @@ jobs:
           fi
 
           if [ -z "${SIMULATOR_ID:-}" ]; then
-            echo "No available iOS simulator device found."
-            xcrun simctl list devices
-            exit 1
+            echo "No iPhone/iPad simulator IDs found. Falling back to 'Any iOS Simulator Device'."
+            echo "destination=platform=iOS Simulator,name=Any iOS Simulator Device" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           SIMULATOR_ID="$(echo "$SIMULATOR_ID" | xargs)"
