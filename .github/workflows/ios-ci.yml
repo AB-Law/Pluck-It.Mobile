@@ -54,13 +54,35 @@ jobs:
       - name: Resolve Swift package dependencies
         run: xcodebuild -resolvePackageDependencies -project PluckIt.Mobile.xcodeproj
 
+      - name: Select available iOS simulator
+        id: select-simulator
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID=$(xcrun simctl list devices available \
+            | awk -F'[()]' '/iPhone/{print $2; exit}')
+
+          if [ -z "${SIMULATOR_ID:-}" ]; then
+            SIMULATOR_ID=$(xcrun simctl list devices available \
+              | awk -F'[()]' '/iPad/{print $2; exit}')
+          fi
+
+          if [ -z "${SIMULATOR_ID:-}" ]; then
+            echo "No available iOS simulator device found."
+            xcrun simctl list devices
+            exit 1
+          fi
+
+          SIMULATOR_ID="$(echo "$SIMULATOR_ID" | xargs)"
+          echo "destination=platform=iOS Simulator,id=${SIMULATOR_ID}" >> "$GITHUB_OUTPUT"
+          echo "Using simulator id: ${SIMULATOR_ID}"
+
       - name: Run tests on iOS simulator
         run: |
           xcodebuild \
             test \
             -project PluckIt.Mobile.xcodeproj \
             -scheme PluckIt.Mobile \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination "${{ steps.select-simulator.outputs.destination }}" \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
             -resultBundlePath ./build/PluckIt.Mobile.xcresult \
             -quiet
