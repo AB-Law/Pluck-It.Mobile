@@ -44,6 +44,12 @@ private struct StylistBubble: Identifiable {
     let createdAt: Date = Date()
 }
 
+private extension StylistBubble {
+    var isStreamingPlaceholder: Bool {
+        role == .assistant && streaming && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 private struct FitRationale {
     let summary: String
     let tags: [String]
@@ -195,8 +201,10 @@ struct StylistView: View {
             ScrollView {
                 VStack(spacing: PluckTheme.Spacing.md) {
                     ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                        messageBubble(for: message)
-                            .pluckReveal(delay: min(Double(index) * 0.03, 0.24))
+                        if !message.isStreamingPlaceholder {
+                            messageBubble(for: message)
+                                .pluckReveal(delay: min(Double(index) * 0.03, 0.24))
+                        }
                     }
 
                     if sending, let activeToolName {
@@ -359,7 +367,7 @@ struct StylistView: View {
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if message.streaming {
+                if message.streaming && !message.text.isEmpty {
                     Text("_")
                         .font(.caption)
                         .foregroundStyle(PluckTheme.secondaryText)
