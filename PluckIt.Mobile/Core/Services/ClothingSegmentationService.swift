@@ -28,7 +28,7 @@ enum ClothingSegmentationService {
         // 2. Flat-lay foreground mask
         if #available(iOS 17.0, *),
            let masked = try? foregroundMask(cgImage: cgImage, orientation: orientation),
-           let data = masked.jpegData(compressionQuality: 0.9) {
+           let data = masked.pngData() ?? masked.jpegData(compressionQuality: 0.9) {
             return [SegmentedClothingItem(labelID: -1, label: "Clothing", imageData: data)]
         }
 
@@ -72,12 +72,10 @@ enum ClothingSegmentationService {
 
         let outputSize = CGSize(width: ciMasked.extent.width, height: ciMasked.extent.height)
         let format = UIGraphicsImageRendererFormat()
-        format.opaque = true
+        format.opaque = false
         format.scale = 1
 
         return UIGraphicsImageRenderer(size: outputSize, format: format).image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: outputSize))
             ctx.cgContext.translateBy(x: 0, y: outputSize.height)
             ctx.cgContext.scaleBy(x: 1, y: -1)
             ctx.cgContext.draw(maskedCG, in: CGRect(origin: .zero, size: outputSize))

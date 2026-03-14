@@ -16,8 +16,8 @@ final class CollectionService {
         if let query, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             params["query"] = query
         }
-        let response: CollectionPageResponse = try await client.send(method: "GET", path: basePath, query: params)
-        return response.items
+        let response: CollectionListResponse = try await client.send(method: "GET", path: basePath, query: params)
+        return response.collections
     }
 
     func createCollection(_ request: CreateCollectionRequest) async throws -> Collection {

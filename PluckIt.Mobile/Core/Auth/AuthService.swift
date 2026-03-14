@@ -8,6 +8,9 @@ struct AppIdentity: Codable, Equatable {
     let userId: String
     let email: String?
     let token: String?
+    let refreshToken: String?
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
     let isLocalMock: Bool
 }
 
@@ -23,7 +26,10 @@ final class AuthService: ObservableObject {
         case missingGoogleClientId
         case missingGoogleIdToken
         case missingExchangeToken
+        case missingRefreshToken
+        case tokenAudienceMismatch(expectedClientId: String, actualClientId: String?)
         case exchangeFailed(String)
+        case refreshFailed(String)
 
         var errorDescription: String? {
             switch self {
@@ -31,8 +37,15 @@ final class AuthService: ObservableObject {
                 return "Google OAuth is not configured. Set PLUCKIT_GOOGLE_CLIENT_ID or include GoogleService-Info.plist."
             case .missingGoogleIdToken:
                 return "Google Sign-In did not return an ID token."
+            case .missingRefreshToken:
+                return "No refresh token available to refresh the session."
+            case .tokenAudienceMismatch(let expectedClientId, let actualClientId):
+                let actual = actualClientId ?? "unknown"
+                return "Google token audience mismatch. Expected client ID \(expectedClientId), got \(actual)."
             case .missingExchangeToken:
                 return "Auth relay response did not include an app token."
+            case .refreshFailed(let message):
+                return "Failed to refresh session token: \(message)"
             case .exchangeFailed(let message):
                 return "Failed to exchange Google token: \(message)"
             }
@@ -45,6 +58,8 @@ final class AuthService: ObservableObject {
 
     private let runtimeConfiguration: RuntimeConfiguration
     private let tokenExchangeClient: APIClient
+    private static let identityStorageKey = "pluckIt.local.identity"
+    private static let accessTokenRefreshGracePeriodSeconds: TimeInterval = 60
 
     /// Creates the auth service.
     ///
@@ -58,7 +73,7 @@ final class AuthService: ObservableObject {
 
     /// Initializes auth state from persisted local storage.
     func bootstrap() {
-        if let value = UserDefaults.standard.string(forKey: "pluckIt.local.identity") {
+        if let value = UserDefaults.standard.string(forKey: Self.identityStorageKey) {
             identity = try? JSONDecoder().decode(AppIdentity.self, from: Data(base64Encoded: value) ?? Data())
             isSignedIn = identity != nil
 
@@ -67,7 +82,23 @@ final class AuthService: ObservableObject {
                (identity?.isLocalMock == true) {
                 identity = nil
                 isSignedIn = false
-                UserDefaults.standard.removeObject(forKey: "pluckIt.local.identity")
+                UserDefaults.standard.removeObject(forKey: Self.identityStorageKey)
+            }
+            if isSignedIn,
+               !runtimeConfiguration.useMockAuthFallback,
+               let token = identity?.token,
+               let expectedClientId = runtimeConfiguration.googleClientId,
+               let tokenAudience = extractJWTAudience(from: token),
+               tokenAudience != expectedClientId {
+                #if DEBUG
+                print("[Auth] Persisted session token audience mismatch. Stored token is for \(tokenAudience), expected \(expectedClientId). Clearing local session.")
+                #endif
+                identity = nil
+                isSignedIn = false
+                UserDefaults.standard.removeObject(forKey: Self.identityStorageKey)
+            }
+            Task {
+                await self.bootstrapRefreshIfNeeded()
             }
         }
 
@@ -77,6 +108,9 @@ final class AuthService: ObservableObject {
                 userId: runtimeConfiguration.mockUserId ?? "local-dev-user",
                 email: runtimeConfiguration.mockUserEmail ?? "local@pluckit.test",
                 token: runtimeConfiguration.localMockToken,
+                refreshToken: nil,
+                accessTokenExpiresAt: nil,
+                refreshTokenExpiresAt: nil,
                 isLocalMock: true
             )
             identity = fallback
@@ -86,10 +120,46 @@ final class AuthService: ObservableObject {
 
     /// Clears in-memory and persisted auth state.
     func signOut() {
+        let identityToRevoke = identity
+        clearStoredIdentity()
+        GIDSignIn.sharedInstance.signOut()
+        Task { [weak self] in
+            await self?.revokeSession(identityToRevoke)
+        }
+    }
+
+    /// Clears stored state without calling Google sign out, used for session refresh invalidation.
+    private func clearStoredIdentity() {
         identity = nil
         isSignedIn = false
-        UserDefaults.standard.removeObject(forKey: "pluckIt.local.identity")
-        GIDSignIn.sharedInstance.signOut()
+        UserDefaults.standard.removeObject(forKey: Self.identityStorageKey)
+    }
+
+    private func revokeSession(_ currentIdentity: AppIdentity?) async {
+        guard let currentIdentity,
+              !currentIdentity.isLocalMock,
+              !runtimeConfiguration.skipAuthHeader else { return }
+
+        guard currentIdentity.refreshToken?.isEmpty == false || !currentIdentity.userId.isEmpty else {
+            return
+        }
+
+        do {
+            let request = MobileAuthRevokeRequest(
+                refreshToken: currentIdentity.refreshToken,
+                userId: currentIdentity.userId
+            )
+            let body = try tokenExchangeClient.jsonEncoder.encode(request)
+            _ = try await tokenExchangeClient.sendVoid(
+                method: "POST",
+                path: runtimeConfiguration.googleTokenRevokePath,
+                body: body
+            )
+        } catch {
+            #if DEBUG
+            print("[Auth] Failed to revoke session: \(error)")
+            #endif
+        }
     }
 
     /// Provides a bearer token for API requests.
@@ -98,8 +168,179 @@ final class AuthService: ObservableObject {
     func currentToken() async -> String? {
         guard isSignedIn else { return nil }
         if runtimeConfiguration.skipAuthHeader { return nil }
-        if let token = identity?.token, !token.isEmpty { return token }
-        return runtimeConfiguration.useMockAuthFallback ? identity?.userId : nil
+
+        if runtimeConfiguration.useMockAuthFallback {
+            if let token = identity?.token, !token.isEmpty {
+                return token
+            }
+            return identity?.userId
+        }
+
+        guard let currentIdentity = identity else { return nil }
+        if currentIdentity.isLocalMock {
+            if let token = currentIdentity.token, !token.isEmpty {
+                return token
+            }
+            return currentIdentity.userId
+        }
+
+        guard let token = currentIdentity.token, !token.isEmpty else {
+            if await refreshSession() {
+                return identity?.token
+            }
+            return nil
+        }
+
+        if isJwtToken(token), let expiration = extractJWTExpiration(token), expiration <= Date() {
+            #if DEBUG
+            print("[Auth] Persisted JWT expired, clearing local session for user \(currentIdentity.userId).")
+            #endif
+            clearStoredIdentity()
+            return nil
+        }
+
+        if !isJwtToken(token) && !tokenNeedsRefresh(currentIdentity) {
+            #if DEBUG
+            let audience = extractJWTAudience(from: token) ?? "non-JWT"
+            print("[Auth] currentToken session token aud: \(audience)")
+            print("[Auth] currentToken session token preview: \(String(token.prefix(20)))...")
+            #endif
+            return token
+        }
+
+        if await refreshSession() {
+            return identity?.token
+        }
+
+        if !tokenNeedsRefresh(currentIdentity) {
+            return token
+        }
+        return nil
+    }
+
+    private func isJwtToken(_ token: String) -> Bool {
+        let segments = token.split(separator: ".")
+        return segments.count == 3
+    }
+
+    private func extractJWTExpiration(_ token: String) -> Date? {
+        let segments = token.split(separator: ".")
+        guard segments.count == 3 else {
+            return nil
+        }
+        var payload = String(segments[1])
+        payload = payload
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        if payload.count % 4 != 0 {
+            payload += String(repeating: "=", count: 4 - payload.count % 4)
+        }
+        guard
+            let payloadData = Data(base64Encoded: payload, options: .ignoreUnknownCharacters),
+            let payloadJson = try? JSONSerialization.jsonObject(with: payloadData, options: []),
+            let payloadMap = payloadJson as? [String: Any],
+            let exp = payloadMap["exp"] else {
+            return nil
+        }
+
+        if let expInt = exp as? TimeInterval {
+            return Date(timeIntervalSince1970: expInt)
+        }
+        if let expInt = exp as? Int {
+            return Date(timeIntervalSince1970: TimeInterval(expInt))
+        }
+        if let expString = exp as? String, let expInt = TimeInterval(expString) {
+            return Date(timeIntervalSince1970: expInt)
+        }
+        return nil
+    }
+
+    /// Refreshes the current access token from the stored refresh token.
+    func refreshSession() async -> Bool {
+        guard isSignedIn else { return false }
+        guard let currentIdentity = identity else { return false }
+        if !currentIdentity.isLocalMock {
+            if let refreshToken = currentIdentity.refreshToken, !refreshToken.isEmpty {
+                if isRefreshTokenExpired(refreshExpiresAt: currentIdentity.refreshTokenExpiresAt) {
+                    clearStoredIdentity()
+                    return false
+                }
+            } else {
+                let error = AuthError.missingRefreshToken
+                lastAuthError = error.localizedDescription
+                return false
+            }
+        }
+
+        guard let refreshToken = currentIdentity.refreshToken, !refreshToken.isEmpty else {
+            return false
+        }
+
+        do {
+            let body = try tokenExchangeClient.jsonEncoder.encode(
+                MobileAuthRefreshRequest(refreshToken: refreshToken)
+            )
+            let response: MobileAuthResponse = try await tokenExchangeClient.send(
+                method: "POST",
+                path: runtimeConfiguration.googleTokenRefreshPath,
+                body: body
+            )
+
+            guard let nextIdentity = buildIdentity(
+                from: response,
+                fallbackUserId: currentIdentity.userId,
+                fallbackEmail: currentIdentity.email,
+                fallbackRefreshToken: refreshToken
+            ) else {
+                let error = AuthError.missingExchangeToken
+                lastAuthError = error.localizedDescription
+                return false
+            }
+
+            identity = nextIdentity
+            isSignedIn = true
+            persist(identity: nextIdentity)
+            lastAuthError = nil
+            return true
+        } catch {
+            let refreshError = AuthError.refreshFailed(String(describing: error))
+            lastAuthError = refreshError.localizedDescription
+            #if DEBUG
+            print("[Auth] refreshSession failed: \(refreshError.localizedDescription)")
+            #endif
+            return false
+        }
+    }
+
+    private func bootstrapRefreshIfNeeded() async {
+        if runtimeConfiguration.useMockAuthFallback || runtimeConfiguration.skipAuthHeader { return }
+        guard let currentIdentity = identity, !currentIdentity.isLocalMock else { return }
+        if tokenNeedsRefresh(currentIdentity) {
+            let refreshed = await refreshSession()
+            if !refreshed {
+                #if DEBUG
+                print("[Auth] bootstrap refresh attempt failed for user: \(currentIdentity.userId)")
+                #endif
+            }
+        }
+    }
+
+    private func tokenNeedsRefresh(_ identity: AppIdentity) -> Bool {
+        if identity.isLocalMock {
+            return false
+        }
+        if identity.token == nil {
+            return !(identity.refreshToken ?? "").isEmpty
+        }
+        guard let expiresAt = identity.accessTokenExpiresAt else {
+            return false
+        }
+        return expiresAt <= Date().addingTimeInterval(Self.accessTokenRefreshGracePeriodSeconds)
+    }
+
+    private func isRefreshTokenExpired(refreshExpiresAt: Date?) -> Bool {
+        guard let refreshExpiresAt else { return false }
+        return refreshExpiresAt <= Date()
     }
 
     /// Updates current local identity and persists it.
@@ -112,6 +353,9 @@ final class AuthService: ObservableObject {
             userId: userId,
             email: email,
             token: token,
+            refreshToken: nil,
+            accessTokenExpiresAt: nil,
+            refreshTokenExpiresAt: nil,
             isLocalMock: true
         )
         identity = nextIdentity
@@ -127,6 +371,9 @@ final class AuthService: ObservableObject {
         guard let googleClientId = runtimeConfiguration.googleClientId else {
             throw AuthError.missingGoogleClientId
         }
+        #if DEBUG
+        print("[Auth] Google client in use: \(googleClientId)")
+        #endif
 
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: googleClientId)
 
@@ -143,6 +390,25 @@ final class AuthService: ObservableObject {
             lastAuthError = error.localizedDescription
             throw error
         }
+        guard let tokenAudience = extractJWTAudience(from: idToken) else {
+            #if DEBUG
+            print("[Auth] Google ID token could not be decoded; unable to validate audience")
+            #endif
+            let error = AuthError.tokenAudienceMismatch(expectedClientId: googleClientId, actualClientId: nil)
+            lastAuthError = error.localizedDescription
+            throw error
+        }
+        #if DEBUG
+        print("[Auth] Google ID token aud: \(tokenAudience)")
+        #endif
+        guard tokenAudience == googleClientId else {
+            let error = AuthError.tokenAudienceMismatch(
+                expectedClientId: googleClientId,
+                actualClientId: tokenAudience
+            )
+            lastAuthError = error.localizedDescription
+            throw error
+        }
 
         do {
             let body = try tokenExchangeClient.jsonEncoder.encode(MobileAuthRequest(idToken: idToken))
@@ -152,18 +418,15 @@ final class AuthService: ObservableObject {
                 body: body
             )
 
-            guard let appToken = resolveToken(from: response) else {
+            guard let nextIdentity = buildIdentity(
+                from: response,
+                fallbackUserId: signInResult.user.userID,
+                fallbackEmail: signInResult.user.profile?.email
+            ) else {
                 let error = AuthError.missingExchangeToken
                 self.lastAuthError = error.localizedDescription
                 throw error
             }
-
-            let nextIdentity = AppIdentity(
-                userId: resolveUserId(from: response, fallback: signInResult.user.userID),
-                email: resolveEmail(from: response, fallback: signInResult.user.profile?.email),
-                token: appToken,
-                isLocalMock: false
-            )
             identity = nextIdentity
             isSignedIn = true
             persist(identity: nextIdentity)
@@ -180,8 +443,30 @@ final class AuthService: ObservableObject {
     /// - Parameter identity: The identity object to persist.
     func persist(identity: AppIdentity) {
         if let data = try? JSONEncoder().encode(identity) {
-            UserDefaults.standard.setValue(data.base64EncodedString(), forKey: "pluckIt.local.identity")
+            UserDefaults.standard.setValue(data.base64EncodedString(), forKey: Self.identityStorageKey)
         }
+    }
+
+    private func buildIdentity(
+        from response: MobileAuthResponse,
+        fallbackUserId: String?,
+        fallbackEmail: String?,
+        fallbackRefreshToken: String? = nil
+    ) -> AppIdentity? {
+        let appToken = resolveToken(from: response)
+        guard let appToken, !appToken.isEmpty else {
+            return nil
+        }
+
+        return AppIdentity(
+            userId: resolveUserId(from: response, fallback: fallbackUserId),
+            email: resolveEmail(from: response, fallback: fallbackEmail),
+            token: appToken,
+            refreshToken: resolveRefreshToken(from: response) ?? fallbackRefreshToken,
+            accessTokenExpiresAt: response.accessTokenExpiresAt,
+            refreshTokenExpiresAt: response.refreshTokenExpiresAt ?? identity?.refreshTokenExpiresAt,
+            isLocalMock: false
+        )
     }
 
     /// Resolves a usable token from Google auth response payloads.
@@ -192,6 +477,11 @@ final class AuthService: ObservableObject {
             ?? response.appToken
             ?? response.idToken
             ?? resolveToken(from: response.data)
+    }
+
+    private func resolveRefreshToken(from response: MobileAuthResponse) -> String? {
+        response.refreshToken
+            ?? response.data?.refreshToken
     }
 
     private func resolveToken(from response: MobileAuthResponsePayload?) -> String? {
@@ -235,10 +525,38 @@ final class AuthService: ObservableObject {
             ?? response.user?.email
             ?? fallback
     }
+
+    private func extractJWTAudience(from token: String) -> String? {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var payload = String(parts[1])
+        payload = payload
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        if payload.count % 4 != 0 {
+            payload += String(repeating: "=", count: 4 - payload.count % 4)
+        }
+        guard let payloadData = Data(base64Encoded: payload, options: .ignoreUnknownCharacters) else {
+            return nil
+        }
+        guard let decodedPayload = try? JSONDecoder().decode(GoogleIDTokenPayload.self, from: payloadData) else {
+            return nil
+        }
+        return decodedPayload.aud
+    }
 }
 
 private struct MobileAuthRequest: Encodable {
     let idToken: String
+}
+
+private struct MobileAuthRefreshRequest: Encodable {
+    let refreshToken: String
+}
+
+private struct MobileAuthRevokeRequest: Encodable {
+    let refreshToken: String?
+    let userId: String
 }
 
 private struct MobileAuthResponse: Decodable {
@@ -247,6 +565,9 @@ private struct MobileAuthResponse: Decodable {
     let sessionToken: String?
     let appToken: String?
     let idToken: String?
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
+    let refreshToken: String?
     let userId: String?
     let email: String?
     let user: MobileAuthUser?
@@ -266,7 +587,14 @@ private struct MobileAuthResponsePayload: Decodable {
     let sessionToken: String?
     let appToken: String?
     let idToken: String?
+    let accessTokenExpiresAt: Date?
+    let refreshTokenExpiresAt: Date?
+    let refreshToken: String?
     let userId: String?
     let email: String?
     let user: MobileAuthUser?
+}
+
+private struct GoogleIDTokenPayload: Decodable {
+    let aud: String?
 }

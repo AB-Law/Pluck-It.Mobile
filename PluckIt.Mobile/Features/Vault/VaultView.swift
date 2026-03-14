@@ -118,9 +118,18 @@ struct VaultView: View {
                 }
             }
             .sheet(item: $selectedItem) { item in
-                VaultItemDrawerView(item: item) { updated in
-                    syncItem(updated)
-                }
+                VaultItemDrawerView(
+                    item: item,
+                    onUpdated: { updated in
+                        syncItem(updated)
+                    },
+                    onDeleted: { deletedId in
+                        items.removeAll { $0.id == deletedId }
+                        if selectedItem?.id == deletedId {
+                            selectedItem = nil
+                        }
+                    }
+                )
                 .environmentObject(appServices)
             }
             .scrollContentBackground(.hidden)

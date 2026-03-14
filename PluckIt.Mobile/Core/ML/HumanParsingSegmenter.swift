@@ -122,10 +122,10 @@ enum HumanParsingSegmenter {
             guard let cropped = cgImage.cropping(to: CGRect(x: minX, y: minY, width: cropW, height: cropH)) else { continue }
 
             let composited = composite(cgImage: cropped, mask: cropMask, width: cropW, height: cropH)
-            guard let jpegData = composited.jpegData(compressionQuality: 0.9) else { continue }
+            guard let imageData = composited.pngData() ?? composited.jpegData(compressionQuality: 0.9) else { continue }
 
             let label = SegmentedClothingItem.labelNames[labelID] ?? "Clothing"
-            items.append(SegmentedClothingItem(labelID: labelID, label: label, imageData: jpegData))
+            items.append(SegmentedClothingItem(labelID: labelID, label: label, imageData: imageData))
         }
 
         return items
@@ -248,33 +248,33 @@ enum HumanParsingSegmenter {
     private static func composite(cgImage: CGImage, mask: [Bool], width: Int, height: Int) -> UIImage {
         let size = CGSize(width: width, height: height)
         let format = UIGraphicsImageRendererFormat()
-        format.opaque = true
+        format.opaque = false
         format.scale = 1
 
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { ctx in
-            // Draw background
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
+            let context = ctx.cgContext
+            context.clear(CGRect(origin: .zero, size: size))
 
             // Draw original image exactly as UIKit interprets it
             UIImage(cgImage: cgImage).draw(in: CGRect(origin: .zero, size: size))
 
             // Punch out non-clothing
-            UIColor.white.setFill()
+            context.setBlendMode(.clear)
             for y in 0..<height {
                 var x = 0
                 while x < width {
                     if !mask[y * width + x] {
                         var runEnd = x + 1
                         while runEnd < width && !mask[y * width + runEnd] { runEnd += 1 }
-                        ctx.fill(CGRect(x: x, y: y, width: runEnd - x, height: 1))
+                        context.fill(CGRect(x: x, y: y, width: runEnd - x, height: 1))
                         x = runEnd
                     } else {
                         x += 1
                     }
                 }
             }
+            context.setBlendMode(.normal)
         }
     }
 

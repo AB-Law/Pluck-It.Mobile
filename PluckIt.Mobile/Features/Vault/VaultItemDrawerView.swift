@@ -6,15 +6,19 @@ struct VaultItemDrawerView: View {
 
     let item: ClothingItem
     let onUpdated: (ClothingItem) -> Void
+    let onDeleted: (String) -> Void
 
     @State private var currentItem: ClothingItem
     @State private var isEditPresented = false
     @State private var isLoggingWear = false
+    @State private var isDeleting = false
     @State private var errorText: String?
+    @State private var showDeleteConfirmation = false
 
-    init(item: ClothingItem, onUpdated: @escaping (ClothingItem) -> Void) {
+    init(item: ClothingItem, onUpdated: @escaping (ClothingItem) -> Void, onDeleted: @escaping (String) -> Void) {
         self.item = item
         self.onUpdated = onUpdated
+        self.onDeleted = onDeleted
         self._currentItem = State(initialValue: item)
     }
 
@@ -248,6 +252,32 @@ struct VaultItemDrawerView: View {
             .buttonStyle(.borderedProminent)
             .tint(PluckTheme.accent)
             .disabled(isLoggingWear)
+
+            Button {
+                pluckImpactFeedback(.medium)
+                showDeleteConfirmation = true
+            } label: {
+                if isDeleting {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Delete item", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .disabled(isDeleting || isLoggingWear)
+            .alert("Delete item", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    showDeleteConfirmation = false
+                }
+                Button("Delete", role: .destructive) {
+                    Task { await deleteCurrentItem() }
+                }
+            } message: {
+                Text("This will permanently remove this item from your wardrobe and cannot be undone.")
+            }
         }
         .padding(.horizontal, PluckTheme.Spacing.md)
     }
@@ -284,12 +314,27 @@ struct VaultItemDrawerView: View {
                 lastWornAt: currentItem.lastWornAt,
                 wearEvents: currentItem.wearEvents,
                 draftCreatedAt: currentItem.draftCreatedAt,
-                draftUpdatedAt: currentItem.draftUpdatedAt
+                draftUpdatedAt: currentItem.draftUpdatedAt,
+                isWishlisted: currentItem.isWishlisted
             )
             onUpdated(currentItem)
         } catch {
             errorText = error.localizedDescription
         }
+    }
+
+    private func deleteCurrentItem() async {
+        guard !isDeleting else { return }
+        isDeleting = true
+        errorText = nil
+        do {
+            try await appServices.wardrobeService.delete(currentItem.id)
+            onDeleted(currentItem.id)
+            dismiss()
+        } catch {
+            errorText = error.localizedDescription
+        }
+        isDeleting = false
     }
 
     private func formattedCurrency(_ value: Double) -> String {

@@ -55,6 +55,42 @@ struct CollectionPageResponse: Codable {
     }
 }
 
+enum CollectionListResponse: Decodable {
+    case items([Collection])
+    case page(CollectionPageResponse)
+
+    var collections: [Collection] {
+        switch self {
+        case let .items(list):
+            return list
+        case let .page(page):
+            return page.items
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let collections = try? container.decode([Collection].self) {
+            self = .items(collections)
+            return
+        }
+
+        if let pageResponse = try? container.decode(CollectionPageResponse.self) {
+            self = .page(pageResponse)
+            return
+        }
+
+        throw DecodingError.typeMismatch(
+            CollectionListResponse.self,
+            DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected collection list response as array or paged object."
+            )
+        )
+    }
+}
+
 struct CreateCollectionRequest: Codable {
     let name: String
     let isPublic: Bool

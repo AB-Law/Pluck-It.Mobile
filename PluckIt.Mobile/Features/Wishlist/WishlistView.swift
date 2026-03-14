@@ -16,6 +16,9 @@ struct WishlistView: View {
     @State private var draftItems: [String: ClothingItem] = [:]
     @State private var pollingTask: Task<Void, Never>?
     @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var presegmentedQueueItemIDs: Set<UUID> = []
+    @State private var segmentedWishlistItems: [SegmentedClothingItem] = []
+    @State private var isSegmentingWishlist = false
 
     // Item drawer / draft review
     @State private var selectedItem: ClothingItem?
@@ -78,7 +81,9 @@ struct WishlistView: View {
                         Image(systemName: "plus")
                             .foregroundStyle(PluckTheme.primaryText)
                     }
+                    .disabled(isSegmentingWishlist)
                     .onChange(of: photoPickerItems) {
+                        guard !photoPickerItems.isEmpty else { return }
                         Task { await enqueuePhotos() }
                     }
                 }
@@ -91,9 +96,18 @@ struct WishlistView: View {
             }
             .shellToolbar()
             .sheet(item: $selectedItem) { item in
-                VaultItemDrawerView(item: item) { updated in
-                    syncItem(updated)
-                }
+                VaultItemDrawerView(
+                    item: item,
+                    onUpdated: { updated in
+                        syncItem(updated)
+                    },
+                    onDeleted: { deletedId in
+                        allItems.removeAll { $0.id == deletedId }
+                        if selectedItem?.id == deletedId {
+                            selectedItem = nil
+                        }
+                    }
+                )
                 .environmentObject(appServices)
             }
             .sheet(item: $reviewItem) { item in
@@ -101,6 +115,19 @@ struct WishlistView: View {
                     Task { await acceptDraft(updated) }
                 }
                 .environmentObject(appServices)
+            }
+            .sheet(isPresented: Binding(
+                get: { !segmentedWishlistItems.isEmpty },
+                set: { if !$0 { segmentedWishlistItems = [] } }
+            )) {
+                ClothingItemSelectionSheet(
+                    items: segmentedWishlistItems,
+                    onUpload: { selected in
+                        segmentedWishlistItems = []
+                        Task { await enqueuePresegmentedWishlistItems(selected) }
+                    },
+                    onCancel: { segmentedWishlistItems = [] }
+                )
             }
             .scrollContentBackground(.hidden)
         }
@@ -300,7 +327,8 @@ struct WishlistView: View {
         do {
             let response = try await appServices.wardrobeService.fetchItems(
                 pageSize: 60,
-                continuationToken: refresh ? nil : nextToken
+                continuationToken: refresh ? nil : nextToken,
+                includeWishlisted: true
             )
             let wishlisted = response.items.filter { $0.isWishlisted }
             if refresh {
@@ -323,22 +351,28 @@ struct WishlistView: View {
     // MARK: - Upload
 
     private func enqueuePhotos() async {
-        var newItems: [UploadQueueItem] = []
+        guard !photoPickerItems.isEmpty else { return }
+        isSegmentingWishlist = true
+        defer { isSegmentingWishlist = false }
+
+        var segmentedItems: [SegmentedClothingItem] = []
         for pickerItem in photoPickerItems {
             guard let data = try? await pickerItem.loadTransferable(type: Data.self) else { continue }
-            newItems.append(UploadQueueItem(imageData: data))
+            segmentedItems.append(contentsOf: await ClothingSegmentationService.segmentIntoItems(imageData: data))
         }
         photoPickerItems = []
-        queue.append(contentsOf: newItems)
-        for item in newItems {
-            await uploadQueueItem(item)
-        }
+        segmentedWishlistItems = segmentedItems
     }
 
     private func uploadQueueItem(_ queueItem: UploadQueueItem) async {
         updateState(id: queueItem.id, state: .uploading)
         do {
-            let draft = try await appServices.wardrobeService.uploadForDraftWishlisted(imageData: queueItem.imageData)
+            let draft: ClothingItem
+            if presegmentedQueueItemIDs.contains(queueItem.id) {
+                draft = try await appServices.wardrobeService.uploadForDraftWishlistedPresegmented(imageData: queueItem.imageData)
+            } else {
+                draft = try await appServices.wardrobeService.uploadForDraftWishlisted(imageData: queueItem.imageData)
+            }
             updateDraftId(id: queueItem.id, draftId: draft.id)
             draftItems[draft.id] = draft
             let status = draft.draftStatus?.lowercased()
@@ -352,7 +386,24 @@ struct WishlistView: View {
                 startPollingIfNeeded()
             }
         } catch {
+            if let apiError = error as? APIClient.ErrorResponse, apiError.statusCode == 401 {
+                updateState(id: queueItem.id, state: .failed("Unauthorized (401). Please sign in again and retry."))
+                return
+            }
             updateState(id: queueItem.id, state: .failed(error.localizedDescription))
+        }
+    }
+
+    private func enqueuePresegmentedWishlistItems(_ items: [SegmentedClothingItem]) async {
+        var newItems: [UploadQueueItem] = []
+        for item in items {
+            let queueItem = UploadQueueItem(imageData: item.imageData)
+            newItems.append(queueItem)
+            presegmentedQueueItemIDs.insert(queueItem.id)
+        }
+        queue.append(contentsOf: newItems)
+        for queueItem in newItems {
+            Task { await uploadQueueItem(queueItem) }
         }
     }
 
@@ -366,6 +417,7 @@ struct WishlistView: View {
         do {
             try await appServices.wardrobeService.acceptDraft(draftId)
             queue.removeAll { $0.id == queueId }
+            presegmentedQueueItemIDs.remove(queueId)
             draftItems.removeValue(forKey: draftId)
             await loadItems(refresh: true)
         } catch {

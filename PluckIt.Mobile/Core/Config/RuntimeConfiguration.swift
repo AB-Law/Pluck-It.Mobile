@@ -24,6 +24,8 @@ struct RuntimeConfiguration {
 
     /// Relative backend path for exchanging Google ID token -> app session token.
     let googleTokenExchangePath: String
+    let googleTokenRefreshPath: String
+    let googleTokenRevokePath: String
 
     /// Enable mock/local identity even without a real auth token.
     let useMockAuthFallback: Bool
@@ -131,6 +133,8 @@ struct RuntimeConfiguration {
             ?? readEnv("GOOGLE_REVERSED_CLIENT_ID")
             ?? readGooglePlist("REVERSED_CLIENT_ID")
         self.googleTokenExchangePath = readEnv("PLUCKIT_TOKEN_RELAY_PATH") ?? "/api/auth/mobile-token"
+        self.googleTokenRefreshPath = readEnv("PLUCKIT_TOKEN_REFRESH_PATH") ?? "/api/auth/refresh"
+        self.googleTokenRevokePath = readEnv("PLUCKIT_TOKEN_REVOKE_PATH") ?? "/api/auth/revoke"
         let networkDebugFromEnv = readBool("PLUCKIT_NETWORK_DEBUG", defaultValue: false)
 #if DEBUG
         self.networkDebugEnabled = networkDebugFromEnv

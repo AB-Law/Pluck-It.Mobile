@@ -13,6 +13,7 @@ final class WardrobeService {
         continuationToken: String? = nil,
         sortField: String? = nil,
         sortDir: String? = nil,
+        includeWishlisted: Bool? = nil,
         query: String? = nil,
         brand: String? = nil,
         condition: String? = nil,
@@ -27,6 +28,7 @@ final class WardrobeService {
         }
         if let sortField, !sortField.isEmpty { params["sortField"] = sortField }
         if let sortDir, !sortDir.isEmpty { params["sortDir"] = sortDir }
+        if let includeWishlisted { params["includeWishlisted"] = String(includeWishlisted) }
         if let query, !query.isEmpty { params["query"] = query }
         if let brand, !brand.isEmpty { params["brand"] = brand }
         if let condition, !condition.isEmpty { params["condition"] = condition }
@@ -47,21 +49,44 @@ final class WardrobeService {
 
     /// Uploads a pre-segmented image, telling the backend to skip BiRefNet.
     func uploadForDraftPresegmented(imageData: Data) async throws -> ClothingItem {
+        let uploadMeta = Self.imageUploadMetadata(for: imageData)
         return try await client.uploadMultipart(
             path: "\(basePath)/upload",
             imageData: imageData,
+            fileName: uploadMeta.fileName,
+            mimeType: uploadMeta.mimeType,
             extraFields: ["skip_segmentation": "true"]
         )
     }
 
     /// Uploads an image as a wishlisted item (not added to vault).
-    /// Skips BiRefNet since mobile already handles on-device segmentation.
+    /// Keeps backend segmentation enabled for automatic wishlist processing.
     func uploadForDraftWishlisted(imageData: Data) async throws -> ClothingItem {
         return try await client.uploadMultipart(
             path: "\(basePath)/upload",
             imageData: imageData,
+            extraFields: ["is_wishlisted": "true"]
+        )
+    }
+
+    /// Uploads a wishlisted, pre-segmented image and skips backend segmentation.
+    func uploadForDraftWishlistedPresegmented(imageData: Data) async throws -> ClothingItem {
+        let uploadMeta = Self.imageUploadMetadata(for: imageData)
+        return try await client.uploadMultipart(
+            path: "\(basePath)/upload",
+            imageData: imageData,
+            fileName: uploadMeta.fileName,
+            mimeType: uploadMeta.mimeType,
             extraFields: ["is_wishlisted": "true", "skip_segmentation": "true"]
         )
+    }
+
+    private static func imageUploadMetadata(for imageData: Data) -> (fileName: String, mimeType: String) {
+        let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
+        if imageData.starts(with: pngSignature) {
+            return ("image.png", "image/png")
+        }
+        return ("image.jpg", "image/jpeg")
     }
 
     func retryDraft(_ draftId: String) async throws {
@@ -70,6 +95,11 @@ final class WardrobeService {
 
     func dismissDraft(_ draftId: String) async throws {
         try await client.sendVoid(method: "DELETE", path: "\(basePath)/\(draftId)")
+    }
+
+    /// Deletes a saved wardrobe item from the main archive.
+    func delete(_ itemId: String) async throws {
+        try await client.sendVoid(method: "DELETE", path: "\(basePath)/\(itemId)")
     }
 
     func createDraft(from item: ClothingItem) async throws -> ClothingItem {

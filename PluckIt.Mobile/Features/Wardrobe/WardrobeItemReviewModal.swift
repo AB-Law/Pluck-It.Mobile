@@ -414,7 +414,8 @@ struct WardrobeItemReviewModal: View {
             lastWornAt: item.lastWornAt,
             wearEvents: item.wearEvents,
             draftCreatedAt: item.draftCreatedAt,
-            draftUpdatedAt: item.draftUpdatedAt
+                draftUpdatedAt: item.draftUpdatedAt,
+                isWishlisted: item.isWishlisted
         )
     }
 

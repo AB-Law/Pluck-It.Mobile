@@ -54,30 +54,52 @@ final class APIClient {
         timeout: TimeInterval = 30,
     ) async throws -> T {
         let url = buildUrl(path: path, query: query)
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.timeoutInterval = timeout
-        request.httpBody = body
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-
-        if let token = await tokenProvider?() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        func buildRequest(for token: String?) -> URLRequest {
+            var request = URLRequest(url: url)
+            request.httpMethod = method
+            request.timeoutInterval = timeout
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+            if let token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            return request
         }
 
-        logRequest(method: method, url: url, headers: request.allHTTPHeaderFields ?? [:], body: body)
+        let requestToken = await tokenProvider?()
+        var urlRequest = buildRequest(for: requestToken)
+        logTokenAudit(method: method, url: url, token: requestToken)
+        logRequest(method: method, url: url, headers: urlRequest.allHTTPHeaderFields ?? [:], body: body)
 
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
+            var (data, response) = try await session.data(for: urlRequest)
+            guard var httpResponse = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
+            }
+            if httpResponse.statusCode == 401, let tokenProvider {
+                let refreshedToken = await tokenProvider()
+                if let refreshedToken, !refreshedToken.isEmpty {
+                    urlRequest = buildRequest(for: refreshedToken)
+                    logTokenAudit(method: method, url: url, token: refreshedToken)
+                    logRequest(method: method, url: url, headers: urlRequest.allHTTPHeaderFields ?? [:], body: body)
+                    let retryPair = try await session.data(for: urlRequest)
+                    data = retryPair.0
+                    guard let retryResponse = retryPair.1 as? HTTPURLResponse else {
+                        throw URLError(.badServerResponse)
+                    }
+                    httpResponse = retryResponse
+                }
             }
 
             let bodyText = String(data: data, encoding: .utf8)
             logResponse(url: url, statusCode: httpResponse.statusCode, body: bodyText)
 
             guard (200 ... 299).contains(httpResponse.statusCode) else {
+                if httpResponse.statusCode == 401 {
+                    logUnauthorizedResponse(method: method, url: url, body: bodyText)
+                }
                 throw ErrorResponse(statusCode: httpResponse.statusCode, body: bodyText, requestURL: url)
             }
 
@@ -117,28 +139,53 @@ final class APIClient {
         timeout: TimeInterval = 30
     ) async throws -> Void {
         let url = buildUrl(path: path, query: query)
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.timeoutInterval = timeout
-        request.httpBody = body
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        if let token = await tokenProvider?() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        func buildRequest(for token: String?) -> URLRequest {
+            var request = URLRequest(url: url)
+            request.httpMethod = method
+            request.timeoutInterval = timeout
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+            if let token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            return request
         }
 
-        logRequest(method: method, url: url, headers: request.allHTTPHeaderFields ?? [:], body: body)
+        let requestToken = await tokenProvider?()
+        var urlRequest = buildRequest(for: requestToken)
+        logTokenAudit(method: method, url: url, token: requestToken)
+        logRequest(method: method, url: url, headers: urlRequest.allHTTPHeaderFields ?? [:], body: body)
 
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
+            var (data, response) = try await session.data(for: urlRequest)
+            guard var httpResponse = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
             }
+
+            if httpResponse.statusCode == 401, let tokenProvider {
+                let refreshedToken = await tokenProvider()
+                if let refreshedToken, !refreshedToken.isEmpty {
+                    urlRequest = buildRequest(for: refreshedToken)
+                    logTokenAudit(method: method, url: url, token: refreshedToken)
+                    logRequest(method: method, url: url, headers: urlRequest.allHTTPHeaderFields ?? [:], body: body)
+                    let retryPair = try await session.data(for: urlRequest)
+                    data = retryPair.0
+                    guard let retryResponse = retryPair.1 as? HTTPURLResponse else {
+                        throw URLError(.badServerResponse)
+                    }
+                    httpResponse = retryResponse
+                }
+            }
+
             let bodyText = String(data: data, encoding: .utf8)
             logResponse(url: url, statusCode: httpResponse.statusCode, body: bodyText)
 
             guard (200 ... 299).contains(httpResponse.statusCode) else {
+                if httpResponse.statusCode == 401 {
+                    logUnauthorizedResponse(method: method, url: url, body: bodyText)
+                }
                 throw ErrorResponse(statusCode: httpResponse.statusCode, body: bodyText, requestURL: url)
             }
         } catch {
@@ -176,26 +223,51 @@ final class APIClient {
         body.append(imageData)
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = timeout
-        request.httpBody = body
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token = await tokenProvider?() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        func buildRequest(for token: String?) -> URLRequest {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = timeout
+            request.httpBody = body
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            if let token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            return request
         }
 
-        logRequest(method: "POST", url: url, headers: request.allHTTPHeaderFields ?? [:], body: nil)
+        let requestToken = await tokenProvider?()
+        var urlRequest = buildRequest(for: requestToken)
+        logTokenAudit(method: "POST", url: url, token: requestToken)
+        logRequest(method: "POST", url: url, headers: urlRequest.allHTTPHeaderFields ?? [:], body: nil)
 
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
+            var (data, response) = try await session.data(for: urlRequest)
+            guard var httpResponse = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
             }
+
+            if httpResponse.statusCode == 401, let tokenProvider {
+                let refreshedToken = await tokenProvider()
+                if let refreshedToken, !refreshedToken.isEmpty {
+                    urlRequest = buildRequest(for: refreshedToken)
+                    logTokenAudit(method: "POST", url: url, token: refreshedToken)
+                    logRequest(method: "POST", url: url, headers: urlRequest.allHTTPHeaderFields ?? [:], body: nil)
+                    let retryPair = try await session.data(for: urlRequest)
+                    data = retryPair.0
+                    guard let retryResponse = retryPair.1 as? HTTPURLResponse else {
+                        throw URLError(.badServerResponse)
+                    }
+                    httpResponse = retryResponse
+                }
+            }
+
             let bodyText = String(data: data, encoding: .utf8)
             logResponse(url: url, statusCode: httpResponse.statusCode, body: bodyText)
             guard (200 ... 299).contains(httpResponse.statusCode) else {
+                if httpResponse.statusCode == 401 {
+                    logUnauthorizedResponse(method: "POST", url: url, body: bodyText)
+                }
                 throw ErrorResponse(statusCode: httpResponse.statusCode, body: bodyText, requestURL: url)
             }
             do {
@@ -224,9 +296,11 @@ final class APIClient {
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        if let token = await tokenProvider?() {
+        let requestToken = await tokenProvider?()
+        if let token = requestToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        logTokenAudit(method: method, url: requestURL, token: requestToken)
         return request
     }
 
@@ -289,9 +363,60 @@ final class APIClient {
         let bodyText = body.flatMap { String(data: $0, encoding: .utf8) } ?? "<empty>"
         print("🛰 APIClient request: \(method) \(url.absoluteString)")
         if !headers.isEmpty {
-            print("🛰 headers: \(headers)")
+            print("🛰 headers: \(redactedHeaders(headers))")
         }
         print("🛰 body: \(bodyText)")
+    }
+
+    private func logTokenAudit(method: String, url: URL, token: String?) {
+        #if DEBUG
+        guard let token else {
+            print("🛰 [Auth] request has no token for \(method) \(url.absoluteString)")
+            return
+        }
+        let audience = extractJWTAudience(from: token) ?? "non-JWT"
+        let tokenPrefix = String(token.prefix(20))
+        print("🛰 [Auth] request token aud for \(method) \(url.absoluteString): \(audience)")
+        print("🛰 [Auth] request token preview for \(method) \(url.absoluteString): \(tokenPrefix)...")
+        #endif
+    }
+
+    private func extractJWTAudience(from token: String) -> String? {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var payload = String(parts[1])
+        payload = payload
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        if payload.count % 4 != 0 {
+            payload += String(repeating: "=", count: 4 - payload.count % 4)
+        }
+        guard let payloadData = Data(base64Encoded: payload, options: .ignoreUnknownCharacters),
+              let json = try? JSONSerialization.jsonObject(with: payloadData, options: []),
+              let payloadData = json as? [String: Any] else {
+            return nil
+        }
+        if let aud = payloadData["aud"] as? String {
+            return aud
+        }
+        if let audList = payloadData["aud"] as? [String], let first = audList.first {
+            return first
+        }
+        return nil
+    }
+
+    private func redactedHeaders(_ headers: [String: String]) -> [String: String] {
+        var redacted = headers
+        if let auth = headers["Authorization"] {
+            let trimmed = auth.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("Bearer ") {
+                let token = String(trimmed.dropFirst("Bearer ".count))
+                redacted["Authorization"] = "Bearer \(String(token.prefix(8)))..."
+            } else {
+                redacted["Authorization"] = "<redacted>"
+            }
+        }
+        return redacted
     }
 
     private func logResponse(url: URL, statusCode: Int, body: String?) {
@@ -314,6 +439,12 @@ final class APIClient {
         guard debugLoggingEnabled else { return }
         print("🛰 APIClient error: \(context)")
         print("🛰 Error: \(error)")
+    }
+
+    private func logUnauthorizedResponse(method: String, url: URL, body: String?) {
+        let preview = body.map { String($0.prefix(4_000)) } ?? "<empty>"
+        print("⚠️ APIClient 401 unauthorized (\(method) \(url.absoluteString))")
+        print("⚠️ Response body: \(preview)")
     }
 
     private func isCancellationError(_ error: Error) -> Bool {
