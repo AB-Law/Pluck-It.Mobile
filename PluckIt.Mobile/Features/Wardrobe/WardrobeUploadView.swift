@@ -22,9 +22,9 @@ struct WardrobeUploadView: View {
     @State private var isLoadingDrafts = false
     @State private var activeQueueActionItemId: UUID?
 
-    // MARK: - Segmentation test
+    // MARK: - Segmentation
     @State private var segmentationPickerItems: [PhotosPickerItem] = []
-    @State private var segmentationPreview: (original: Data, segmented: Data)?
+    @State private var segmentedItems: [SegmentedClothingItem] = []
     @State private var isSegmenting = false
 
     private var hasProcessingItems: Bool {
@@ -82,16 +82,17 @@ struct WardrobeUploadView: View {
             .environmentObject(appServices)
         }
         .sheet(isPresented: Binding(
-            get: { segmentationPreview != nil },
-            set: { if !$0 { segmentationPreview = nil } }
+            get: { !segmentedItems.isEmpty },
+            set: { if !$0 { segmentedItems = [] } }
         )) {
-            if let preview = segmentationPreview {
-                SegmentationPreviewSheet(
-                    originalData: preview.original,
-                    segmentedData: preview.segmented,
-                    onDismiss: { segmentationPreview = nil }
-                )
-            }
+            ClothingItemSelectionSheet(
+                items: segmentedItems,
+                onUpload: { selected in
+                    segmentedItems = []
+                    Task { await enqueuePresegmentedItems(selected) }
+                },
+                onCancel: { segmentedItems = [] }
+            )
         }
         .onChange(of: queue) {
             onPendingCountChanged?(queue.filter { $0.isReady }.count)
@@ -148,10 +149,38 @@ struct WardrobeUploadView: View {
     private func runSegmentationTest(_ pickerItem: PhotosPickerItem) async {
         isSegmenting = true
         defer { isSegmenting = false; segmentationPickerItems = [] }
+        guard let imageData = try? await pickerItem.loadTransferable(type: Data.self) else { return }
+        let items = await ClothingSegmentationService.segmentIntoItems(imageData: imageData)
+        segmentedItems = items
+    }
 
-        guard let originalData = try? await pickerItem.loadTransferable(type: Data.self) else { return }
-        let segmented = (try? await ClothingSegmentationService.segment(imageData: originalData)) ?? originalData
-        segmentationPreview = (original: originalData, segmented: segmented)
+    private func enqueuePresegmentedItems(_ items: [SegmentedClothingItem]) async {
+        let queueItems = items.map { UploadQueueItem(imageData: $0.imageData) }
+        queue.append(contentsOf: queueItems)
+        for item in queueItems {
+            Task { await uploadPresegmentedQueueItem(item) }
+        }
+    }
+
+    private func uploadPresegmentedQueueItem(_ queueItem: UploadQueueItem) async {
+        updateState(id: queueItem.id, state: .uploading)
+        do {
+            let draft = try await appServices.wardrobeService.uploadForDraftPresegmented(imageData: queueItem.imageData)
+            updateDraftId(id: queueItem.id, draftId: draft.id)
+            draftItems[draft.id] = draft
+            let status = draft.draftStatus?.lowercased()
+            if status == "ready" {
+                updateState(id: queueItem.id, state: .ready)
+                onUploaded()
+            } else if status == "failed" {
+                updateState(id: queueItem.id, state: .failed(draft.draftError))
+            } else {
+                updateState(id: queueItem.id, state: .processing)
+                startPollingIfNeeded()
+            }
+        } catch {
+            updateState(id: queueItem.id, state: .failed(error.localizedDescription))
+        }
     }
 
     private var uploadEmptyState: some View {

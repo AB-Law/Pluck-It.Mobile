@@ -45,6 +45,25 @@ final class WardrobeService {
         return try await client.uploadMultipart(path: "\(basePath)/upload", imageData: imageData)
     }
 
+    /// Uploads a pre-segmented image, telling the backend to skip BiRefNet.
+    func uploadForDraftPresegmented(imageData: Data) async throws -> ClothingItem {
+        return try await client.uploadMultipart(
+            path: "\(basePath)/upload",
+            imageData: imageData,
+            extraFields: ["skip_segmentation": "true"]
+        )
+    }
+
+    /// Uploads an image as a wishlisted item (not added to vault).
+    /// Skips BiRefNet since mobile already handles on-device segmentation.
+    func uploadForDraftWishlisted(imageData: Data) async throws -> ClothingItem {
+        return try await client.uploadMultipart(
+            path: "\(basePath)/upload",
+            imageData: imageData,
+            extraFields: ["is_wishlisted": "true", "skip_segmentation": "true"]
+        )
+    }
+
     func retryDraft(_ draftId: String) async throws {
         try await client.sendVoid(method: "POST", path: "\(basePath)/drafts/\(draftId)/retry")
     }

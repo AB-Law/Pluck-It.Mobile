@@ -508,7 +508,12 @@ struct StylistView: View {
     private func resendPendingMessages() {
         guard appServices.networkMonitor.isOnline else { return }
         Task { @MainActor in
-            while !pendingMessages.isEmpty && !sending {
+            guard !sending else { return }
+            guard !pendingMessages.isEmpty else { return }
+            sending = true
+            defer { sending = false }
+
+            while !pendingMessages.isEmpty {
                 let messageText = pendingMessages.removeFirst()
                 let success = await sendQueuedMessage(messageText)
                 if !success {

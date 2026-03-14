@@ -19,6 +19,12 @@ struct MobileShellView: View {
                 }
                 .tag(PluckTab.vault)
 
+            WishlistView()
+                .tabItem {
+                    Label("Wishlist", systemImage: "heart")
+                }
+                .tag(PluckTab.wishlist)
+
             CollectionsView()
                 .tabItem {
                     Label("Collections", systemImage: "rectangle.stack")

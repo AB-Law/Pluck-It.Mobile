@@ -26,6 +26,9 @@ enum HumanParsingSegmenter {
         }
     }()
 
+    // MARK: - Public API
+
+    /// Returns one composited UIImage of all clothing combined (used for flat-lay preview).
     static func segment(cgImage: CGImage) async throws -> UIImage {
         print("\n--- [Segmenter] Starting Segmentation ---")
         print("[Segmenter] Original image size: \(cgImage.width)x\(cgImage.height)")
@@ -51,8 +54,9 @@ enum HumanParsingSegmenter {
 
         // 3. Build Mask
         print("[Segmenter] Decoding mask from MLMultiArray...")
-        let mask512 = buildClothingMask(from: labelArray, size: side)
-        
+        let labelMap = buildLabelMap(from: labelArray, size: side)
+        let mask512 = labelMap.map { clothingLabelIDs.contains($0) }
+
         // --- DEBUG LOGGING: Print the mask to the console ---
         printAsciiMask(mask: mask512, size: side)
 
@@ -60,9 +64,71 @@ enum HumanParsingSegmenter {
         print("[Segmenter] Scaling mask and compositing final image...")
         let maskFull = scaleMask(mask512, from: side, toWidth: cgImage.width, toHeight: cgImage.height)
         let finalImage = composite(cgImage: cgImage, mask: maskFull, width: cgImage.width, height: cgImage.height)
-        
+
         print("--- [Segmenter] Finished Segmentation ---\n")
         return finalImage
+    }
+
+    /// Segments each clothing category into a separate cropped UIImage.
+    static func segmentIntoItems(cgImage: CGImage) async throws -> [SegmentedClothingItem] {
+        guard let model else { throw SegmentationError.modelNotFound }
+
+        let side = modelInputSize
+        let inputArray = try makeInputArray(from: cgImage, targetSize: side)
+        let inputFeatures = try MLDictionaryFeatureProvider(dictionary: ["pixel_values": inputArray])
+        let output = try await model.prediction(from: inputFeatures)
+
+        guard let labelArray = output.featureValue(for: "label_map")?.multiArrayValue else {
+            throw SegmentationError.outputDecodeFailed
+        }
+
+        let labelMap512 = buildLabelMap(from: labelArray, size: side)
+
+        // Scale label map to original image size
+        let w = cgImage.width, h = cgImage.height
+        var labelMapFull = [Int](repeating: 0, count: w * h)
+        for y in 0..<h {
+            let srcY = y * side / h
+            for x in 0..<w {
+                let srcX = x * side / w
+                labelMapFull[y * w + x] = labelMap512[srcY * side + srcX]
+            }
+        }
+
+        // Build one item per clothing label that has enough pixels
+        var items: [SegmentedClothingItem] = []
+        for labelID in clothingLabelIDs.sorted() {
+            let pixels = labelMapFull.enumerated().filter { $0.element == labelID }
+            guard pixels.count >= 500 else { continue }
+
+            // Compute bounding box in original image space
+            let xs = pixels.map { $0.offset % w }
+            let ys = pixels.map { $0.offset / w }
+            guard let minX = xs.min(), let maxX = xs.max(),
+                  let minY = ys.min(), let maxY = ys.max() else { continue }
+
+            let cropW = maxX - minX + 1
+            let cropH = maxY - minY + 1
+
+            // Build mask for this label within the crop bounding box
+            var cropMask = [Bool](repeating: false, count: cropW * cropH)
+            for p in pixels {
+                let px = p.offset % w - minX
+                let py = p.offset / w - minY
+                cropMask[py * cropW + px] = true
+            }
+
+            // Crop the original cgImage to bounding box
+            guard let cropped = cgImage.cropping(to: CGRect(x: minX, y: minY, width: cropW, height: cropH)) else { continue }
+
+            let composited = composite(cgImage: cropped, mask: cropMask, width: cropW, height: cropH)
+            guard let jpegData = composited.jpegData(compressionQuality: 0.9) else { continue }
+
+            let label = SegmentedClothingItem.labelNames[labelID] ?? "Clothing"
+            items.append(SegmentedClothingItem(labelID: labelID, label: label, imageData: jpegData))
+        }
+
+        return items
     }
 
     // MARK: - Private helpers
@@ -90,7 +156,9 @@ enum HumanParsingSegmenter {
                 throw SegmentationError.preprocessFailed
             }
             
-            let rawBytes = CFDataGetBytePtr(pixelData)!
+            guard let rawBytes = CFDataGetBytePtr(pixelData) else {
+                throw SegmentationError.preprocessFailed
+            }
             let bytesPerRow = normalizedCG.bytesPerRow
             let bpp = normalizedCG.bitsPerPixel / 8 // Will now correctly be 4 bytes
             let bitmapInfo = normalizedCG.bitmapInfo
@@ -126,8 +194,9 @@ enum HumanParsingSegmenter {
             return array
         }
 
-    private static func buildClothingMask(from labelArray: MLMultiArray, size: Int) -> [Bool] {
-        var mask = [Bool](repeating: false, count: size * size)
+    /// Returns a flat [size×size] array of raw label IDs from the model output.
+    private static func buildLabelMap(from labelArray: MLMultiArray, size: Int) -> [Int] {
+        var map = [Int](repeating: 0, count: size * size)
         let strides = labelArray.strides
         let yStride = strides[strides.count - 2].intValue
         let xStride = strides[strides.count - 1].intValue
@@ -137,18 +206,16 @@ enum HumanParsingSegmenter {
             for x in 0..<size {
                 let linearIndex = y * yStride + x * xStride
                 let classID: Int
-                
                 switch labelArray.dataType {
                 case .float32: classID = Int(rawPtr.load(fromByteOffset: linearIndex * 4, as: Float32.self))
                 case .float16: classID = Int(rawPtr.load(fromByteOffset: linearIndex * 2, as: Float16.self))
                 case .int32:   classID = Int(rawPtr.load(fromByteOffset: linearIndex * 4, as: Int32.self))
-                default:       return mask
+                default:       classID = 0
                 }
-
-                mask[y * size + x] = clothingLabelIDs.contains(classID)
+                map[y * size + x] = classID
             }
         }
-        return mask
+        return map
     }
     
     /// Renders a low-res version of the 512x512 mask to the Xcode console

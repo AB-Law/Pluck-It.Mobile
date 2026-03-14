@@ -5,32 +5,38 @@ import CoreImage
 
 enum ClothingSegmentationService {
 
-    /// Segments clothing from an image.
-    /// - If a person is detected: uses SegFormer-B2-Clothes (Core ML) to extract only garment pixels.
-    /// - If no person (flat-lay): uses VNGenerateForegroundInstanceMaskRequest (iOS 17+).
-    /// Falls back to the original image on any failure.
-    static func segment(imageData: Data) async throws -> Data {
+    /// Segments clothing from an image into individual items for user selection.
+    /// - Person detected: SegFormer per-category items (jacket, jeans, shoes…)
+    /// - Flat-lay: single item from VNGenerateForegroundInstanceMaskRequest
+    /// - Fallback: single item wrapping the original image
+    static func segmentIntoItems(imageData: Data) async -> [SegmentedClothingItem] {
         guard let uiImage = UIImage(data: imageData),
-              let cgImage = uiImage.cgImage else { return imageData }
+              let cgImage = uiImage.cgImage else {
+            return fallback(imageData: imageData)
+        }
 
         let orientation = CGImagePropertyOrientation(uiImage.imageOrientation)
+        let oriented = orientedCGImage(cgImage, orientation: uiImage.imageOrientation)
 
-        // 1. Fast person detection gate (~15ms)
+        // 1. Fast person detection gate
         if await detectPerson(in: cgImage, orientation: orientation) {
-            // 2a. Human parsing path — clothing-only segmentation
-            if let result = try? await HumanParsingSegmenter.segment(cgImage: orientedCGImage(cgImage, orientation: uiImage.imageOrientation)) {
-                return result.jpegData(compressionQuality: 0.9) ?? imageData
+            if let items = try? await HumanParsingSegmenter.segmentIntoItems(cgImage: oriented), !items.isEmpty {
+                return items
             }
         }
 
-        // 2b. Flat-lay path — generic foreground mask (iOS 17+)
-        if #available(iOS 17.0, *) {
-            if let result = try? foregroundMask(cgImage: cgImage, orientation: orientation) {
-                return result.jpegData(compressionQuality: 0.9) ?? imageData
-            }
+        // 2. Flat-lay foreground mask
+        if #available(iOS 17.0, *),
+           let masked = try? foregroundMask(cgImage: cgImage, orientation: orientation),
+           let data = masked.jpegData(compressionQuality: 0.9) {
+            return [SegmentedClothingItem(labelID: -1, label: "Clothing", imageData: data)]
         }
 
-        return imageData
+        return fallback(imageData: imageData)
+    }
+
+    private static func fallback(imageData: Data) -> [SegmentedClothingItem] {
+        [SegmentedClothingItem(labelID: -1, label: "Clothing", imageData: imageData)]
     }
 
     // MARK: - Person detection
@@ -41,7 +47,7 @@ enum ClothingSegmentationService {
         request.upperBodyOnly = false
         guard let _ = try? handler.perform([request]),
               let results = request.results else { return false }
-        return results.contains { $0.confidence > 0.5 }
+        return results.contains { $0.confidence > 0.25 }
     }
 
     // MARK: - Flat-lay foreground mask (iOS 17+)

@@ -164,6 +164,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
     let wearEvents: [WearEvent]?
     let draftCreatedAt: String?
     let draftUpdatedAt: String?
+    let isWishlisted: Bool
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -190,6 +191,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         case wearEvents
         case draftCreatedAt
         case draftUpdatedAt
+        case isWishlisted
     }
 
     init(from decoder: Decoder) throws {
@@ -218,6 +220,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         wearEvents = try container.decodeIfPresent([WearEvent].self, forKey: .wearEvents) ?? []
         draftCreatedAt = try container.decodeIfPresent(String.self, forKey: .draftCreatedAt)
         draftUpdatedAt = try container.decodeIfPresent(String.self, forKey: .draftUpdatedAt)
+        isWishlisted = (try? container.decodeIfPresent(Bool.self, forKey: .isWishlisted)) ?? false
     }
 
     init(
@@ -244,7 +247,8 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         lastWornAt: String? = nil,
         wearEvents: [WearEvent]? = nil,
         draftCreatedAt: String? = nil,
-        draftUpdatedAt: String? = nil
+        draftUpdatedAt: String? = nil,
+        isWishlisted: Bool = false
     ) {
         self.id = id
         self.imageUrl = imageUrl
@@ -270,6 +274,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         self.wearEvents = wearEvents ?? []
         self.draftCreatedAt = draftCreatedAt
         self.draftUpdatedAt = draftUpdatedAt
+        self.isWishlisted = isWishlisted
     }
 
     func searchableText() -> String {

@@ -156,11 +156,20 @@ final class APIClient {
         imageData: Data,
         fileName: String = "image.jpg",
         mimeType: String = "image/jpeg",
-        timeout: TimeInterval = 60
+        timeout: TimeInterval = 60,
+        extraFields: [String: String] = [:]
     ) async throws -> T {
         let url = buildUrl(path: path, query: [:])
         let boundary = "Boundary-\(UUID().uuidString)"
         var body = Data()
+
+        // Append extra text fields before the file part
+        for (name, value) in extraFields {
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".utf8))
+            body.append(Data("\(value)\r\n".utf8))
+        }
+
         body.append(Data("--\(boundary)\r\n".utf8))
         body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".utf8))
         body.append(Data("Content-Type: \(mimeType)\r\n\r\n".utf8))
