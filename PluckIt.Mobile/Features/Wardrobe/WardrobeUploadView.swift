@@ -22,6 +22,11 @@ struct WardrobeUploadView: View {
     @State private var isLoadingDrafts = false
     @State private var activeQueueActionItemId: UUID?
 
+    // MARK: - Segmentation test
+    @State private var segmentationPickerItems: [PhotosPickerItem] = []
+    @State private var segmentationPreview: (original: Data, segmented: Data)?
+    @State private var isSegmenting = false
+
     private var hasProcessingItems: Bool {
         queue.contains { $0.isProcessing }
     }
@@ -76,6 +81,18 @@ struct WardrobeUploadView: View {
             }
             .environmentObject(appServices)
         }
+        .sheet(isPresented: Binding(
+            get: { segmentationPreview != nil },
+            set: { if !$0 { segmentationPreview = nil } }
+        )) {
+            if let preview = segmentationPreview {
+                SegmentationPreviewSheet(
+                    originalData: preview.original,
+                    segmentedData: preview.segmented,
+                    onDismiss: { segmentationPreview = nil }
+                )
+            }
+        }
         .onChange(of: queue) {
             onPendingCountChanged?(queue.filter { $0.isReady }.count)
         }
@@ -100,9 +117,41 @@ struct WardrobeUploadView: View {
             Text("Draft queue: \(pendingDraftCountText)")
                 .font(.caption2)
                 .foregroundStyle(PluckTheme.mutedText)
+
+            // DEBUG: tap to test on-device segmentation
+            PhotosPicker(selection: $segmentationPickerItems, maxSelectionCount: 1, matching: .images) {
+                HStack(spacing: 6) {
+                    if isSegmenting {
+                        ProgressView().scaleEffect(0.7)
+                    } else {
+                        Image(systemName: "scissors")
+                    }
+                    Text(isSegmenting ? "Segmenting…" : "Test Segmentation")
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color.purple.opacity(0.15))
+                .foregroundStyle(Color.purple)
+                .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.medium))
+            }
+            .disabled(isSegmenting)
+            .onChange(of: segmentationPickerItems) {
+                guard let item = segmentationPickerItems.first else { return }
+                Task { await runSegmentationTest(item) }
+            }
         }
         .padding(.horizontal, PluckTheme.Spacing.md)
         .pluckReveal()
+    }
+
+    private func runSegmentationTest(_ pickerItem: PhotosPickerItem) async {
+        isSegmenting = true
+        defer { isSegmenting = false; segmentationPickerItems = [] }
+
+        guard let originalData = try? await pickerItem.loadTransferable(type: Data.self) else { return }
+        let segmented = (try? await ClothingSegmentationService.segment(imageData: originalData)) ?? originalData
+        segmentationPreview = (original: originalData, segmented: segmented)
     }
 
     private var uploadEmptyState: some View {
