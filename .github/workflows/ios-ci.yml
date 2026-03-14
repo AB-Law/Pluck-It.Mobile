@@ -154,7 +154,6 @@ jobs:
             build \
             -project PluckIt.Mobile.xcodeproj \
             -scheme PluckIt.Mac \
-            -destination "platform=macOS,name=Any Mac" \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
             -resultBundlePath ./build/PluckIt.Mac.xcresult \
             -quiet
