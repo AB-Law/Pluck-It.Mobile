@@ -30,19 +30,19 @@ final class APIClient {
         self.debugLoggingEnabled = debugLoggingEnabled
     }
 
-    var jsonEncoder: JSONEncoder {
+    lazy var jsonEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.keyEncodingStrategy = .convertToSnakeCase
         return encoder
-    }
+    }()
 
-    var jsonDecoder: JSONDecoder {
+    lazy var jsonDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
-    }
+    }()
 
     /// Sends a request and decodes the response payload.
     func send<T: Decodable>(
@@ -161,11 +161,11 @@ final class APIClient {
         let url = buildUrl(path: path, query: [:])
         let boundary = "Boundary-\(UUID().uuidString)"
         var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".utf8))
+        body.append(Data("Content-Type: \(mimeType)\r\n\r\n".utf8))
         body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -222,32 +222,53 @@ final class APIClient {
     }
 
     func endpointURL(path: String, query: [String: String] = [:]) -> URL {
-        var components = URLComponents(url: baseUrl, resolvingAgainstBaseURL: false)!
-        let requestedPath = path.hasPrefix("/") ? path : "/\(path)"
-        let basePath = components.path
-        let trimmedBasePath = basePath == "/" ? "" : basePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let trimmedRequested = requestedPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let requestedSegments = (path.hasPrefix("/") ? String(path.dropFirst()) : path)
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
 
-        let normalizedPath: String
-        if trimmedBasePath == "api" && trimmedRequested.hasPrefix("api/") {
-            normalizedPath = String(trimmedRequested.dropFirst("api/".count))
-        } else if trimmedBasePath.hasSuffix("/api") && trimmedRequested.hasPrefix("api/") {
-            normalizedPath = String(trimmedRequested.dropFirst("api/".count))
-        } else {
-            normalizedPath = trimmedRequested
+        let basePath = URLComponents(url: baseUrl, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? baseUrl.path
+        let baseSegments = basePath
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+
+        var normalizedRequested = requestedSegments
+        if normalizedRequested.first == "api", baseSegments.last == "api" {
+            normalizedRequested.removeFirst()
         }
 
-        if normalizedPath.isEmpty {
-            components.path = "/"
-        } else {
-            components.path = "/\( [trimmedBasePath, normalizedPath].filter { !$0.isEmpty }.joined(separator: "/") )"
+        let normalizedSegments = baseSegments + normalizedRequested
+        let normalizedPath = normalizedSegments.isEmpty ? "/" : "/\(normalizedSegments.joined(separator: "/"))"
+
+        guard var components = URLComponents(url: baseUrl, resolvingAgainstBaseURL: false) else {
+            let relativePath = normalizedPath == "/" ? "" : String(normalizedPath.dropFirst())
+            var fallbackURL = baseUrl
+            if !relativePath.isEmpty {
+                fallbackURL = baseUrl.appendingPathComponent(relativePath, isDirectory: false)
+            }
+            if !query.isEmpty,
+               var fallbackComponents = URLComponents(url: fallbackURL, resolvingAgainstBaseURL: false) {
+                fallbackComponents.queryItems = query
+                    .map { URLQueryItem(name: $0.key, value: $0.value) }
+                    .sorted { $0.name < $1.name }
+                return fallbackComponents.url ?? fallbackURL
+            }
+            return fallbackURL
         }
+
+        components.percentEncodedPath = normalizedPath
         if !query.isEmpty {
             components.queryItems = query
                 .map { URLQueryItem(name: $0.key, value: $0.value) }
                 .sorted { $0.name < $1.name }
+        } else {
+            components.queryItems = nil
         }
-        return components.url ?? baseUrl.appendingPathComponent(path)
+        return components.url ?? baseUrl.appendingPathComponent(relativePathFrom(normalizedPath: normalizedPath))
+    }
+
+    private func relativePathFrom(normalizedPath: String) -> String {
+        guard normalizedPath != "/" else { return "" }
+        return String(normalizedPath.dropFirst())
     }
 
     private func buildUrl(path: String, query: [String: String]) -> URL {

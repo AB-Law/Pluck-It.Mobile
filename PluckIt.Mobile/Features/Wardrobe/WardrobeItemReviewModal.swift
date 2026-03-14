@@ -141,7 +141,7 @@ struct WardrobeItemReviewModal: View {
                     }
                     HStack {
                         TextField("Add tag", text: $tagInput)
-                            .autocapitalization(.none)
+                            .textInputAutocapitalization(.never)
                         Button("Add") {
                             pluckImpactFeedback(.light)
                             addTag()

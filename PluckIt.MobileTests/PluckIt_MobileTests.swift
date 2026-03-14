@@ -228,4 +228,36 @@ struct PluckIt_MobileTests {
         #expect(raw["recent_messages"] is [[String: Any]])
     }
 
+    @Test func apiClientEndpointURLDeduplicatesApiSegment() throws {
+        let apiRootClient = APIClient(baseUrl: try #require(URL(string: "https://example.test/api")))
+        #expect(apiRootClient.endpointURL(path: "api/collections").path == "/api/collections")
+
+        let nestedApiClient = APIClient(baseUrl: try #require(URL(string: "https://example.test/v1/api")))
+        #expect(nestedApiClient.endpointURL(path: "api/collections").path == "/v1/api/collections")
+    }
+
+    @Test func apiClientEndpointURLEmptyNormalizedPathReturnsRootPath() throws {
+        let client = APIClient(baseUrl: try #require(URL(string: "https://example.test")))
+        #expect(client.endpointURL(path: "").path == "/")
+    }
+
+    @Test func apiClientEndpointURLCollapsesExtraSlashes() throws {
+        let client = APIClient(baseUrl: try #require(URL(string: "https://example.test/api")))
+        #expect(client.endpointURL(path: "api//v1").path == "/api/v1")
+        #expect(client.endpointURL(path: "/api//v1").path == "/api/v1")
+    }
+
+    @Test func apiClientEndpointURLPreservesPercentEncodedSegments() throws {
+        let client = APIClient(baseUrl: try #require(URL(string: "https://example.test/api")))
+        let encodedPathURL = client.endpointURL(path: "items/photos%2Fautumn%2Fset")
+        #expect(encodedPathURL.absoluteString == "https://example.test/api/items/photos%2Fautumn%2Fset")
+        #expect(!encodedPathURL.absoluteString.contains("photos/autumn/set"))
+    }
+
+    @Test func apiClientEndpointURLJoinsBaseAndPathWithoutExtraSlashes() throws {
+        let client = APIClient(baseUrl: try #require(URL(string: "https://example.test/base")))
+        #expect(client.endpointURL(path: "resources/2026").path == "/base/resources/2026")
+        #expect(client.endpointURL(path: "/resources//2026").path == "/base/resources/2026")
+    }
+
 }

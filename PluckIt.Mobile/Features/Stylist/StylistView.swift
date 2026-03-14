@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 private enum StylistBubbleRole {
     case assistant
@@ -60,11 +61,13 @@ struct StylistView: View {
     @State private var chatHistory: [StylistMessage] = []
     @State private var sending = false
     @State private var activeAssistantIndex: Int?
-    @State private var streamTask: Task<Void, Never>?
+    @State private var streamTask: Task<Void, Error>?
     @State private var activeToolName: String?
     @State private var lastError: String?
     @State private var receivedAnyEvent = false
     @State private var didTrySendWhileOffline = false
+    @State private var pendingMessages: [String] = []
+    @State private var isNetworkOnline = true
     private let quickSuggestions = [
         "Suggest a night out fit",
         "What goes with my leather jacket?",
@@ -123,8 +126,15 @@ struct StylistView: View {
             }
             .shellToolbar()
             .onAppear {
+                isNetworkOnline = appServices.networkMonitor.isOnline
                 if chatHistory.isEmpty {
                     chatHistory = []
+                }
+            }
+            .onReceive(appServices.networkMonitor.$isOnline.removeDuplicates()) { isOnline in
+                isNetworkOnline = isOnline
+                if isOnline {
+                    resendPendingMessages()
                 }
             }
         }
@@ -140,7 +150,7 @@ struct StylistView: View {
                         .font(.title3.weight(.semibold))
                         .tracking(1.2)
                         .foregroundStyle(PluckTheme.primaryText)
-                    Text("SYSTEM: ONLINE")
+                    Text(systemStatusText)
                         .font(.caption)
                         .foregroundStyle(PluckTheme.secondaryText)
                         .padding(.top, 1)
@@ -170,10 +180,14 @@ struct StylistView: View {
         )
     }
 
+    private var systemStatusText: String {
+        isNetworkOnline ? "SYSTEM: ONLINE" : "SYSTEM: OFFLINE"
+    }
+
     private var statusBadge: some View {
         Circle()
-            .fill(appServices.networkMonitor.isOnline ? Color.green : PluckTheme.danger)
-            .animation(.snappy(duration: 0.18), value: appServices.networkMonitor.isOnline)
+            .fill(isNetworkOnline ? Color.green : PluckTheme.danger)
+            .animation(.snappy(duration: 0.18), value: isNetworkOnline)
     }
 
     private var messageArea: some View {
@@ -474,7 +488,6 @@ struct StylistView: View {
 
         draftText = ""
         lastError = nil
-        sending = true
         receivedAnyEvent = false
         didTrySendWhileOffline = false
 
@@ -483,39 +496,84 @@ struct StylistView: View {
         chatHistory.append(StylistMessage(role: .user, content: messageText))
 
         if !appServices.networkMonitor.isOnline {
+            pendingMessages.append(messageText)
             finalizeStream(with: "You're offline. Your message was queued and will send when you reconnect.")
             didTrySendWhileOffline = true
             return
         }
 
-        let assistantIndex = messages.count
-        messages.append(StylistBubble(role: .assistant, text: "", streaming: true))
-        activeAssistantIndex = assistantIndex
-        activeToolName = nil
+        startStreaming(for: messageText, shouldRequeueOnFailure: false)
+    }
 
+    private func resendPendingMessages() {
+        guard appServices.networkMonitor.isOnline else { return }
+        Task { @MainActor in
+            while !pendingMessages.isEmpty && !sending {
+                let messageText = pendingMessages.removeFirst()
+                let success = await sendQueuedMessage(messageText)
+                if !success {
+                    break
+                }
+            }
+        }
+    }
+
+    private func sendQueuedMessage(_ messageText: String) async -> Bool {
+        do {
+            try await sendStreaming(message: messageText, shouldRequeueOnFailure: true)
+            return true
+        } catch {
+            if error is CancellationError {
+                return false
+            }
+            await MainActor.run {
+                finalizeStream(with: "Stylist request failed: \(error)")
+            }
+            return false
+        }
+    }
+
+    private func startStreaming(for messageText: String, shouldRequeueOnFailure: Bool) {
         streamTask?.cancel()
-        streamTask = Task {
+        streamTask = Task { @MainActor in
             do {
-                for try await event in appServices.stylistService.streamChat(
-                    message: messageText,
-                    recentMessages: chatHistory,
-                    selectedItemIds: nil
-                ) {
-                    await MainActor.run {
-                        handle(event)
-                    }
-                }
-                await MainActor.run {
-                    finalizeStream()
-                }
+                try await sendStreaming(message: messageText, shouldRequeueOnFailure: shouldRequeueOnFailure)
+            } catch is CancellationError {
+                return
             } catch {
-                if error is CancellationError {
-                    return
-                }
                 await MainActor.run {
                     finalizeStream(with: "Stylist request failed: \(error)")
                 }
             }
+        }
+    }
+
+    private func sendStreaming(message: String, shouldRequeueOnFailure: Bool) async throws {
+        await MainActor.run {
+            sending = true
+            didTrySendWhileOffline = false
+            let assistantIndex = messages.count
+            messages.append(StylistBubble(role: .assistant, text: "", streaming: true))
+            activeAssistantIndex = assistantIndex
+            activeToolName = nil
+        }
+
+        do {
+            for try await event in appServices.stylistService.streamChat(
+                message: message,
+                recentMessages: chatHistory,
+                selectedItemIds: nil
+            ) {
+                await MainActor.run { handle(event) }
+            }
+            await MainActor.run { finalizeStream() }
+        } catch {
+            if !(error is CancellationError), shouldRequeueOnFailure {
+                await MainActor.run {
+                    pendingMessages.append(message)
+                }
+            }
+            throw error
         }
     }
 

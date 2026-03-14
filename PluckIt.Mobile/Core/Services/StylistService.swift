@@ -4,11 +4,13 @@ import Foundation
 final class StylistService {
     private let client: APIClient
     private let session: URLSession
+    private let debugLoggingEnabled: Bool
 
     /// Creates a stylist chat service bound to a given API client.
-    init(client: APIClient, session: URLSession = .shared) {
+    init(client: APIClient, session: URLSession = .shared, debugLoggingEnabled: Bool = false) {
         self.client = client
         self.session = session
+        self.debugLoggingEnabled = debugLoggingEnabled
     }
 
     /// Starts streaming a stylist conversation and yields typed events as they arrive.
@@ -28,12 +30,13 @@ final class StylistService {
         return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    guard let body = try? client.jsonEncoder.encode(request) else {
+                    let encoder = JSONEncoder()
+                    encoder.dateEncodingStrategy = .iso8601
+                    encoder.keyEncodingStrategy = .convertToSnakeCase
+                    guard let body = try? encoder.encode(request) else {
                         throw StylistServiceError.requestEncodingFailed
                     }
-                    let bodyText = String(data: body, encoding: .utf8) ?? "<invalid utf8>"
-
-                    let request = await client.makeStreamingRequest(
+                    let streamingRequest = await client.makeStreamingRequest(
                         method: "POST",
                         path: "api/chat",
                         body: body,
@@ -42,33 +45,51 @@ final class StylistService {
                             "Accept": "text/event-stream"
                         ]
                     )
-                    print("🛰 StylistService request: POST \(request.url?.absoluteString ?? "<unknown>")")
-                    print("🛰 headers: \(request.allHTTPHeaderFields ?? [:])")
-                    print("🛰 body: \(bodyText)")
+                    if debugLoggingEnabled {
+                        let loggedHeaders = Dictionary(
+                            uniqueKeysWithValues: (streamingRequest.allHTTPHeaderFields ?? [:]).map { key, value in
+                                if key.caseInsensitiveCompare("Authorization") == .orderedSame {
+                                    return (key, "[redacted]")
+                                }
+                                return (key, value)
+                            }
+                        )
+                        print("🛰 StylistService request: POST \(streamingRequest.url?.absoluteString ?? "<unknown>")")
+                        print("🛰 headers: \(loggedHeaders)")
+                        print("🛰 body bytes: \(body.count)")
+                    }
 
-                    let (bytes, response) = try await session.bytes(for: request)
+                    let (bytes, response) = try await session.bytes(for: streamingRequest)
                     guard let httpResponse = response as? HTTPURLResponse else {
                         throw StylistServiceError.invalidHTTPResponse
                     }
-                    print("🛰 StylistService response: \(httpResponse.statusCode) \(request.url?.absoluteString ?? "<unknown>")")
+                    if debugLoggingEnabled {
+                        print("🛰 StylistService response: \(httpResponse.statusCode) \(streamingRequest.url?.absoluteString ?? "<unknown>")")
+                    }
                     guard (200 ... 299).contains(httpResponse.statusCode) else {
                         var errorBody = Data()
                         for try await byte in bytes {
                             errorBody.append(byte)
                         }
                         let message = errorBody.isEmpty ? nil : String(data: errorBody, encoding: .utf8)
-                        throw StylistServiceError.httpFailure(statusCode: httpResponse.statusCode, body: message, requestURL: request.url)
+                        throw StylistServiceError.httpFailure(statusCode: httpResponse.statusCode, body: message, requestURL: streamingRequest.url)
                     }
 
                     var parser = StylistSSEParser()
                     for try await line in bytes.lines {
-                        print("🛰 StylistService stream line: \(line)")
+                        if debugLoggingEnabled {
+                            print("🛰 StylistService stream line: \(line)")
+                        }
                         let events = parser.consume(line: line).map({ $0.withDefaultTraceId(traceId) })
                         if events.isEmpty {
-                            print("🛰 StylistService parsed 0 events for line")
+                            if debugLoggingEnabled {
+                                print("🛰 StylistService parsed 0 events for line")
+                            }
                         }
                         for event in events {
-                            print("🛰 StylistService emit: \(event)")
+                            if debugLoggingEnabled {
+                                print("🛰 StylistService emit: \(event)")
+                            }
                             continuation.yield(event)
                             if case .done = event {
                                 continuation.finish()

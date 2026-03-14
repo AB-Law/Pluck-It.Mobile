@@ -82,15 +82,15 @@ final class WardrobeService {
     }
 
     func acceptDraft(_ draftId: String) async throws {
-        try await client.send(method: "PATCH", path: "\(basePath)/drafts/\(draftId)/accept")
+        try await client.sendVoid(method: "PATCH", path: "\(basePath)/drafts/\(draftId)/accept")
     }
 
     func rejectDraft(_ draftId: String) async throws {
-        try await client.send(method: "POST", path: "\(basePath)/drafts/\(draftId)/reject")
+        try await client.sendVoid(method: "POST", path: "\(basePath)/drafts/\(draftId)/reject")
     }
 
     func logWear(_ itemId: String) async throws {
         let payload = try JSONEncoder().encode(WardrobeWearLogRequest(delta: 1))
-        try await client.send(method: "PATCH", path: "\(basePath)/\(itemId)/wear", body: payload)
+        try await client.sendVoid(method: "PATCH", path: "\(basePath)/\(itemId)/wear", body: payload)
     }
 }

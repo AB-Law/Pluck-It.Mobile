@@ -254,7 +254,8 @@ struct WardrobeView: View {
         } catch {
             guard !isCancellationError(error) else { return }
             guard generation == loadingGeneration else { return }
-            errorText = "Data could not be loaded: \(error)"
+            errorText = "Data could not be loaded. Please try again."
+            print("Wardrobe load failed: \(error)")
         }
     }
 

@@ -16,6 +16,7 @@ struct VaultView: View {
     @State private var itemsTask: Task<Void, Never>?
     @State private var itemsNextToken: String?
     @State private var itemsGeneration = 0
+    @State private var itemsError: String?
 
     // Filtering
     @State private var filters = VaultFilters()
@@ -33,6 +34,13 @@ struct VaultView: View {
                 if insightsLoading && !hasInsightData && items.isEmpty {
                     stateLoadingView()
                         .pluckReveal()
+                } else if let itemsError, items.isEmpty {
+                    stateErrorView(
+                        errorText: itemsError,
+                        retryLabel: "Retry items",
+                        retryAction: { startItemsLoad(refresh: true) }
+                    )
+                    .pluckReveal()
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: PluckTheme.Spacing.md) {
@@ -400,7 +408,11 @@ struct VaultView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func stateErrorView(errorText: String) -> some View {
+    private func stateErrorView(
+        errorText: String,
+        retryLabel: String = "Retry",
+        retryAction: (() -> Void)? = nil
+    ) -> some View {
         VStack(spacing: PluckTheme.Spacing.sm) {
             Text("Vault request failed")
                 .foregroundStyle(PluckTheme.danger)
@@ -410,8 +422,13 @@ struct VaultView: View {
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, PluckTheme.Spacing.md)
-            Button("Retry") { scheduleInsightsLoad() }
-                .buttonStyle(.bordered)
+            if let retryAction {
+                Button(retryLabel, action: retryAction)
+                    .buttonStyle(.bordered)
+            } else {
+                Button("Retry") { scheduleInsightsLoad() }
+                    .buttonStyle(.bordered)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -453,6 +470,7 @@ struct VaultView: View {
         if refresh {
             itemsNextToken = nil
             items = []
+            itemsError = nil
         }
         itemsTask = Task { await runItemsLoad(token: token, generation: gen) }
     }
@@ -511,8 +529,12 @@ struct VaultView: View {
                 items += fetchedItems
             }
             itemsNextToken = response.nextContinuationToken
+            itemsError = nil
         } catch {
-            // silently ignore cancellations
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            guard generation == itemsGeneration else { return }
+            itemsError = "Could not load vault items. Please try again."
+            print("Failed to load vault items: \(error)")
         }
     }
 

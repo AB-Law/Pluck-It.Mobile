@@ -118,23 +118,24 @@ struct ClothingSize: Codable, Equatable {
             return
         }
 
-        struct SizePayload: Codable {
-            let letter: String?
-            let waist: Double?
-            let inseam: Double?
-            let shoeSize: Double?
-            let system: String?
-        }
-
-        let payload = try container.decode(SizePayload.self)
-        let trimmedLetter = payload.letter?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let payloadContainer = try decoder.container(keyedBy: SizePayloadCodingKeys.self)
+        let trimmedLetter = try payloadContainer.decodeIfPresent(String.self, forKey: .letter)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         self.init(
             letter: trimmedLetter?.isEmpty == true ? nil : trimmedLetter,
-            waist: payload.waist,
-            inseam: payload.inseam,
-            shoeSize: payload.shoeSize,
-            system: payload.system
+            waist: try payloadContainer.decodeIfPresent(Double.self, forKey: .waist),
+            inseam: try payloadContainer.decodeIfPresent(Double.self, forKey: .inseam),
+            shoeSize: try payloadContainer.decodeIfPresent(Double.self, forKey: .shoeSize),
+            system: try payloadContainer.decodeIfPresent(String.self, forKey: .system)
         )
+    }
+
+    private enum SizePayloadCodingKeys: String, CodingKey {
+        case letter
+        case waist
+        case inseam
+        case shoeSize
+        case system
     }
 }
 

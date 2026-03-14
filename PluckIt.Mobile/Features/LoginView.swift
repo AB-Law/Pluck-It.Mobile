@@ -116,7 +116,7 @@ struct LoginView: View {
         do {
             try await appServices.authService.signInWithGoogle(presentingViewController: presenter)
         } catch {
-            errorText = String(describing: error)
+            errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
 
         isSigningIn = false

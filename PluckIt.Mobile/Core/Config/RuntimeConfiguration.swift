@@ -49,13 +49,16 @@ struct RuntimeConfiguration {
         }
 
         func readGooglePlist(_ key: String) -> String? {
-            guard let url = Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist"),
+            func readGooglePlistFile(_ name: String) -> String? {
+                guard let url = Bundle.main.url(forResource: name, withExtension: "plist"),
                   let data = try? Data(contentsOf: url),
                   let raw = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
                   let dict = raw as? [String: Any] else {
                 return nil
+                }
+                return dict[key] as? String
             }
-            return dict[key] as? String
+            return readGooglePlistFile("GoogleService-Info.local") ?? readGooglePlistFile("GoogleService-Info")
         }
 
         func normalizeUrl(_ raw: String?) -> String {
@@ -117,6 +120,11 @@ struct RuntimeConfiguration {
             ?? readEnv("GOOGLE_REVERSED_CLIENT_ID")
             ?? readGooglePlist("REVERSED_CLIENT_ID")
         self.googleTokenExchangePath = readEnv("PLUCKIT_TOKEN_RELAY_PATH") ?? "/api/auth/mobile-token"
-        self.networkDebugEnabled = readBool("PLUCKIT_NETWORK_DEBUG", defaultValue: true)
+        let networkDebugFromEnv = readBool("PLUCKIT_NETWORK_DEBUG", defaultValue: false)
+#if DEBUG
+        self.networkDebugEnabled = networkDebugFromEnv
+#else
+        self.networkDebugEnabled = false
+#endif
     }
 }

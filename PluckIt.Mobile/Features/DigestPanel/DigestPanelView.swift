@@ -110,10 +110,9 @@ struct DigestPanelView: View {
             if let rationale = suggestion.rationale, !rationale.isEmpty {
                 Button {
                     let isOpen = index < rationaleOpen.count ? rationaleOpen[index] : false
-                    if index < rationaleOpen.count {
-                        pluckImpactFeedback(.light)
-                        rationaleOpen[index] = !isOpen
-                    }
+                    guard index < rationaleOpen.count else { return }
+                    pluckImpactFeedback(.light)
+                    rationaleOpen[index] = !isOpen
                 } label: {
                     HStack {
                         Text("Why this?")
@@ -125,6 +124,7 @@ struct DigestPanelView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(index >= rationaleOpen.count)
 
                 if index < rationaleOpen.count && rationaleOpen[index] {
                     Text(rationale)

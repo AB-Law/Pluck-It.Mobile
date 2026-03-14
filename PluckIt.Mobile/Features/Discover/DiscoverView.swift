@@ -131,9 +131,9 @@ struct DiscoverView: View {
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, PluckTheme.Spacing.lg)
                             Button("Retry") {
+                            pluckImpactFeedback(.light)
                                 restartFeedLoad()
                             }
-                            .onTapGesture { pluckImpactFeedback(.light) }
                             .buttonStyle(.bordered)
                         }
                         .pluckReveal()

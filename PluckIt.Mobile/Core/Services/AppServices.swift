@@ -55,7 +55,7 @@ final class AppServices: ObservableObject {
         self.discoverService = DiscoverService(client: processorClient)
         self.vaultInsightsService = VaultInsightsService(client: processorClient)
         self.profileService = ProfileService(client: apiClient)
-        self.stylistService = StylistService(client: processorClient)
+        self.stylistService = StylistService(client: processorClient, debugLoggingEnabled: debugEnabled)
         self.digestService = DigestService(client: processorClient)
 
         self.authService.objectWillChange

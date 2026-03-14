@@ -11,6 +11,7 @@ struct CollectionsView: View {
     @State private var newDescription = ""
     @State private var newIsPublic = false
     @State private var selectedCollection: Collection?
+    @State private var collectionToDelete: Collection?
 
     private var filteredCollections: [Collection] {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -82,6 +83,23 @@ struct CollectionsView: View {
             }
             .shellToolbar()
             .scrollContentBackground(.hidden)
+            .alert("Delete collection", isPresented: Binding(
+                get: { collectionToDelete != nil },
+                set: { if !$0 { collectionToDelete = nil } }
+            )) {
+                Button("Cancel", role: .cancel) {
+                    collectionToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    guard let collectionToDelete else { return }
+                    Task {
+                        await deleteCollection(collectionToDelete)
+                        self.collectionToDelete = nil
+                    }
+                }
+            } message: {
+                Text("This action cannot be undone.")
+            }
             .sheet(isPresented: $isCreating, onDismiss: {
                 newName = ""
                 newDescription = ""
@@ -310,9 +328,7 @@ struct CollectionsView: View {
                     .buttonStyle(.bordered)
 
                     Button("Delete") {
-                        Task {
-                            await deleteCollection(collection)
-                        }
+                        collectionToDelete = collection
                     }
                     .font(.caption2)
                     .buttonStyle(.bordered)

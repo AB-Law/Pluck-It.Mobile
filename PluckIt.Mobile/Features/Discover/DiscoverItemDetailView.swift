@@ -10,6 +10,7 @@ struct DiscoverItemDetailView: View {
     @State private var currentImageIndex = 0
     @State private var votedSignal: String?
     @State private var isCommentsExpanded = false
+    @State private var showFeedbackError = false
 
     private var allImages: [String] {
         var images: [String] = []
@@ -52,6 +53,11 @@ struct DiscoverItemDetailView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .alert("Unable to send feedback", isPresented: $showFeedbackError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Could not send feedback right now. Please try again.")
+            }
             .background(PluckTheme.background)
         }
     }
@@ -270,10 +276,18 @@ struct DiscoverItemDetailView: View {
     }
 
     private func sendFeedback(_ signal: String) {
+        let previousSignal = votedSignal
         let imageIndex = allImages.count > 1 ? currentImageIndex : nil
         votedSignal = signal
         Task {
-            try? await appServices.discoverService.sendFeedback(itemId: item.id, signal: signal, galleryImageIndex: imageIndex)
+            do {
+                try await appServices.discoverService.sendFeedback(itemId: item.id, signal: signal, galleryImageIndex: imageIndex)
+            } catch {
+                await MainActor.run {
+                    votedSignal = previousSignal
+                    showFeedbackError = true
+                }
+            }
         }
     }
 }
