@@ -13,7 +13,7 @@ concurrency:
 jobs:
   test:
     name: Build and Test iOS
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 50
 
     defaults:
@@ -53,6 +53,14 @@ jobs:
 
       - name: Resolve Swift package dependencies
         run: xcodebuild -resolvePackageDependencies -project PluckIt.Mobile.xcodeproj
+
+      - name: Validate Xcode simulator support
+        run: |
+          set -euo pipefail
+          echo "Using Xcode:"
+          xcodebuild -version
+          echo "Available iOS runtimes:"
+          xcrun simctl list runtimes | awk '/iOS/{print}'
 
       - name: Select available iOS simulator
         id: select-simulator
@@ -100,7 +108,7 @@ jobs:
 
   mac-build:
     name: Build macOS app
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 30
 
     defaults:
@@ -146,6 +154,7 @@ jobs:
             build \
             -project PluckIt.Mobile.xcodeproj \
             -scheme PluckIt.Mac \
+            -destination "platform=macOS,name=Any Mac" \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
             -resultBundlePath ./build/PluckIt.Mac.xcresult \
             -quiet

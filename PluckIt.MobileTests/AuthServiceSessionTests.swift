@@ -211,7 +211,7 @@ struct AuthServiceSessionTests {
         #expect(MockURLProtocol.observedRequests.isEmpty)
     }
 
-    @Test func signOutClearsIdentityAndPostsRevokeRequest() async {
+    @Test func signOutClearsIdentityAndPostsRevokeRequest() async throws {
         clearStoredIdentity()
         MockURLProtocol.reset()
         configureAuthRuntimeEnvironment()
