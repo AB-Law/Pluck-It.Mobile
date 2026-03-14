@@ -6,27 +6,18 @@
 //
 
 import SwiftUI
-import SwiftData
 
 @main
 struct PluckIt_MacApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @StateObject private var appServices = AppServices()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appServices)
+                .environmentObject(appServices.authService)
+                .environmentObject(appServices.networkMonitor)
         }
-        .modelContainer(sharedModelContainer)
+        .defaultSize(width: 1440, height: 900)
     }
 }

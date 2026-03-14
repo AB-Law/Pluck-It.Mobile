@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		FA50EB242F643F8500EAC905 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = FA50EB232F643F8500EAC905 /* GoogleSignIn */; };
 		FA50EB262F643F8500EAC905 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FA50EB252F643F8500EAC905 /* GoogleSignInSwift */; };
+		FB90AA012F66C10000EAC905 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = FA50EB232F643F8500EAC905 /* GoogleSignIn */; };
+		FB90AA022F66C10000EAC905 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FA50EB252F643F8500EAC905 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,12 +28,29 @@
 			remoteGlobalIDString = FA50EA472F63FC0000EAC905;
 			remoteInfo = PluckIt.Mobile;
 		};
+		FA50EB5D2F65E37A00EAC905 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FA50EA402F63FC0000EAC905 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FA50EB4D2F65E37800EAC905;
+			remoteInfo = PluckIt.Mac;
+		};
+		FA50EB672F65E37A00EAC905 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FA50EA402F63FC0000EAC905 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FA50EB4D2F65E37800EAC905;
+			remoteInfo = PluckIt.Mac;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		FA50EA482F63FC0000EAC905 /* PluckIt.Mobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PluckIt.Mobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA50EA572F63FC0200EAC905 /* PluckIt.MobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluckIt.MobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA50EA612F63FC0200EAC905 /* PluckIt.MobileUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluckIt.MobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA50EB4E2F65E37800EAC905 /* PluckIt.Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PluckIt.Mac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA50EB5C2F65E37A00EAC905 /* PluckIt.MacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluckIt.MacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA50EB662F65E37A00EAC905 /* PluckIt.MacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluckIt.MacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -74,6 +93,26 @@
 			path = PluckIt.MobileUITests;
 			sourceTree = "<group>";
 		};
+		FA50EB4F2F65E37800EAC905 /* PluckIt.Mac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PluckIt.Mac;
+			sourceTree = "<group>";
+		};
+		FA50EB5F2F65E37A00EAC905 /* PluckIt.MacTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PluckIt.MacTests;
+			sourceTree = "<group>";
+		};
+		FA50EB692F65E37A00EAC905 /* PluckIt.MacUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PluckIt.MacUITests;
+			sourceTree = "<group>";
+		};
+		FB90AA032F66C10000EAC905 /* PluckIt.Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PluckIt.Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +139,29 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FA50EB4B2F65E37800EAC905 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FB90AA012F66C10000EAC905 /* GoogleSignIn in Frameworks */,
+				FB90AA022F66C10000EAC905 /* GoogleSignInSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB592F65E37A00EAC905 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB632F65E37A00EAC905 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -109,6 +171,10 @@
 				FA50EA4A2F63FC0000EAC905 /* PluckIt.Mobile */,
 				FA50EA5A2F63FC0200EAC905 /* PluckIt.MobileTests */,
 				FA50EA642F63FC0200EAC905 /* PluckIt.MobileUITests */,
+				FA50EB4F2F65E37800EAC905 /* PluckIt.Mac */,
+				FA50EB5F2F65E37A00EAC905 /* PluckIt.MacTests */,
+				FA50EB692F65E37A00EAC905 /* PluckIt.MacUITests */,
+				FB90AA032F66C10000EAC905 /* PluckIt.Shared */,
 				FA50EA492F63FC0000EAC905 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -119,6 +185,9 @@
 				FA50EA482F63FC0000EAC905 /* PluckIt.Mobile.app */,
 				FA50EA572F63FC0200EAC905 /* PluckIt.MobileTests.xctest */,
 				FA50EA612F63FC0200EAC905 /* PluckIt.MobileUITests.xctest */,
+				FA50EB4E2F65E37800EAC905 /* PluckIt.Mac.app */,
+				FA50EB5C2F65E37A00EAC905 /* PluckIt.MacTests.xctest */,
+				FA50EB662F65E37A00EAC905 /* PluckIt.MacUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -140,6 +209,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				FA50EA4A2F63FC0000EAC905 /* PluckIt.Mobile */,
+				FB90AA032F66C10000EAC905 /* PluckIt.Shared */,
 			);
 			name = PluckIt.Mobile;
 			packageProductDependencies = (
@@ -196,6 +266,77 @@
 			productReference = FA50EA612F63FC0200EAC905 /* PluckIt.MobileUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		FA50EB4D2F65E37800EAC905 /* PluckIt.Mac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA50EB6E2F65E37A00EAC905 /* Build configuration list for PBXNativeTarget "PluckIt.Mac" */;
+			buildPhases = (
+				FA50EB4A2F65E37800EAC905 /* Sources */,
+				FA50EB4B2F65E37800EAC905 /* Frameworks */,
+				FA50EB4C2F65E37800EAC905 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				FA50EB4F2F65E37800EAC905 /* PluckIt.Mac */,
+				FB90AA032F66C10000EAC905 /* PluckIt.Shared */,
+			);
+			name = PluckIt.Mac;
+			packageProductDependencies = (
+				FA50EB232F643F8500EAC905 /* GoogleSignIn */,
+				FA50EB252F643F8500EAC905 /* GoogleSignInSwift */,
+			);
+			productName = PluckIt.Mac;
+			productReference = FA50EB4E2F65E37800EAC905 /* PluckIt.Mac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		FA50EB5B2F65E37A00EAC905 /* PluckIt.MacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA50EB712F65E37A00EAC905 /* Build configuration list for PBXNativeTarget "PluckIt.MacTests" */;
+			buildPhases = (
+				FA50EB582F65E37A00EAC905 /* Sources */,
+				FA50EB592F65E37A00EAC905 /* Frameworks */,
+				FA50EB5A2F65E37A00EAC905 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FA50EB5E2F65E37A00EAC905 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				FA50EB5F2F65E37A00EAC905 /* PluckIt.MacTests */,
+			);
+			name = PluckIt.MacTests;
+			packageProductDependencies = (
+			);
+			productName = PluckIt.MacTests;
+			productReference = FA50EB5C2F65E37A00EAC905 /* PluckIt.MacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		FA50EB652F65E37A00EAC905 /* PluckIt.MacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA50EB742F65E37A00EAC905 /* Build configuration list for PBXNativeTarget "PluckIt.MacUITests" */;
+			buildPhases = (
+				FA50EB622F65E37A00EAC905 /* Sources */,
+				FA50EB632F65E37A00EAC905 /* Frameworks */,
+				FA50EB642F65E37A00EAC905 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FA50EB682F65E37A00EAC905 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				FA50EB692F65E37A00EAC905 /* PluckIt.MacUITests */,
+			);
+			name = PluckIt.MacUITests;
+			packageProductDependencies = (
+			);
+			productName = PluckIt.MacUITests;
+			productReference = FA50EB662F65E37A00EAC905 /* PluckIt.MacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -216,6 +357,17 @@
 					FA50EA602F63FC0200EAC905 = {
 						CreatedOnToolsVersion = 26.3;
 						TestTargetID = FA50EA472F63FC0000EAC905;
+					};
+					FA50EB4D2F65E37800EAC905 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					FA50EB5B2F65E37A00EAC905 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = FA50EB4D2F65E37800EAC905;
+					};
+					FA50EB652F65E37A00EAC905 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = FA50EB4D2F65E37800EAC905;
 					};
 				};
 			};
@@ -239,6 +391,9 @@
 				FA50EA472F63FC0000EAC905 /* PluckIt.Mobile */,
 				FA50EA562F63FC0200EAC905 /* PluckIt.MobileTests */,
 				FA50EA602F63FC0200EAC905 /* PluckIt.MobileUITests */,
+				FA50EB4D2F65E37800EAC905 /* PluckIt.Mac */,
+				FA50EB5B2F65E37A00EAC905 /* PluckIt.MacTests */,
+				FA50EB652F65E37A00EAC905 /* PluckIt.MacUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -259,6 +414,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		FA50EA5F2F63FC0200EAC905 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB4C2F65E37800EAC905 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB5A2F65E37A00EAC905 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB642F65E37A00EAC905 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -289,6 +465,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FA50EB4A2F65E37800EAC905 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB582F65E37A00EAC905 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA50EB622F65E37A00EAC905 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -301,6 +498,16 @@
 			isa = PBXTargetDependency;
 			target = FA50EA472F63FC0000EAC905 /* PluckIt.Mobile */;
 			targetProxy = FA50EA622F63FC0200EAC905 /* PBXContainerItemProxy */;
+		};
+		FA50EB5E2F65E37A00EAC905 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FA50EB4D2F65E37800EAC905 /* PluckIt.Mac */;
+			targetProxy = FA50EB5D2F65E37A00EAC905 /* PBXContainerItemProxy */;
+		};
+		FA50EB682F65E37A00EAC905 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FA50EB4D2F65E37800EAC905 /* PluckIt.Mac */;
+			targetProxy = FA50EB672F65E37A00EAC905 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -576,6 +783,184 @@
 			};
 			name = Release;
 		};
+		FA50EB6F2F65E37A00EAC905 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = PluckIt.Mac/PluckIt.Mac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FTY8CR8DA3;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PluckIt-Mac-Info.plist";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.inshaytiable.PluckIt-Mac";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FA50EB702F65E37A00EAC905 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = PluckIt.Mac/PluckIt.Mac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FTY8CR8DA3;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PluckIt-Mac-Info.plist";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.inshaytiable.PluckIt-Mac";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		FA50EB722F65E37A00EAC905 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FTY8CR8DA3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.inshaytiable.PluckIt-MacTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PluckIt.Mac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PluckIt.Mac";
+			};
+			name = Debug;
+		};
+		FA50EB732F65E37A00EAC905 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FTY8CR8DA3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.inshaytiable.PluckIt-MacTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PluckIt.Mac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PluckIt.Mac";
+			};
+			name = Release;
+		};
+		FA50EB752F65E37A00EAC905 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FTY8CR8DA3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.inshaytiable.PluckIt-MacUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = PluckIt.Mac;
+			};
+			name = Debug;
+		};
+		FA50EB762F65E37A00EAC905 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FTY8CR8DA3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.inshaytiable.PluckIt-MacUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = PluckIt.Mac;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -611,6 +996,33 @@
 			buildConfigurations = (
 				FA50EA722F63FC0200EAC905 /* Debug */,
 				FA50EA732F63FC0200EAC905 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA50EB6E2F65E37A00EAC905 /* Build configuration list for PBXNativeTarget "PluckIt.Mac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA50EB6F2F65E37A00EAC905 /* Debug */,
+				FA50EB702F65E37A00EAC905 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA50EB712F65E37A00EAC905 /* Build configuration list for PBXNativeTarget "PluckIt.MacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA50EB722F65E37A00EAC905 /* Debug */,
+				FA50EB732F65E37A00EAC905 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA50EB742F65E37A00EAC905 /* Build configuration list for PBXNativeTarget "PluckIt.MacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA50EB752F65E37A00EAC905 /* Debug */,
+				FA50EB762F65E37A00EAC905 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

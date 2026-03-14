@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Subtle reveal animation used for page sections and card-like content.
 struct PluckRevealModifier: ViewModifier {
@@ -32,8 +36,14 @@ extension View {
 }
 
 /// Triggers a subtle haptic cue for press and action confirmation.
+#if canImport(UIKit)
 func pluckImpactFeedback(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
     let generator = UIImpactFeedbackGenerator(style: style)
     generator.prepare()
     generator.impactOccurred()
 }
+#else
+func pluckImpactFeedback() {
+    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+}
+#endif

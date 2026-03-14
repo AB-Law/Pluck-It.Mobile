@@ -1,7 +1,11 @@
 import Foundation
 import Combine
 import GoogleSignIn
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Represents the current authenticated identity in local app sessions.
 struct AppIdentity: Codable, Equatable {
@@ -199,13 +203,27 @@ final class AuthService: ObservableObject {
             return nil
         }
 
-        if !isJwtToken(token) && !tokenNeedsRefresh(currentIdentity) {
+        if !isJwtToken(token) {
             #if DEBUG
             let audience = extractJWTAudience(from: token) ?? "non-JWT"
             print("[Auth] currentToken session token aud: \(audience)")
             print("[Auth] currentToken session token preview: \(String(token.prefix(20)))...")
             #endif
-            return token
+            if runtimeConfiguration.useMockAuthFallback {
+                return token
+            }
+            guard currentIdentity.refreshToken?.isEmpty == false else {
+                #if DEBUG
+                print("[Auth] currentToken found non-JWT access token without refresh token. Clearing identity for \(currentIdentity.userId).")
+                #endif
+                clearStoredIdentity()
+                return nil
+            }
+            if await refreshSession() {
+                return identity?.token
+            }
+            clearStoredIdentity()
+            return nil
         }
 
         if await refreshSession() {
@@ -364,9 +382,10 @@ final class AuthService: ObservableObject {
         lastAuthError = nil
     }
 
-    /// Signs in with Google and exchanges the Google ID token for an app token.
+    /// Signs in with Google on iOS and exchanges the Google ID token for an app token.
     ///
     /// - Parameter presentingViewController: Controller used for presenting Google sign-in UI.
+    #if canImport(UIKit)
     func signInWithGoogle(presentingViewController: UIViewController) async throws {
         guard let googleClientId = runtimeConfiguration.googleClientId else {
             throw AuthError.missingGoogleClientId
@@ -411,32 +430,63 @@ final class AuthService: ObservableObject {
         }
 
         do {
-            let body = try tokenExchangeClient.jsonEncoder.encode(MobileAuthRequest(idToken: idToken))
-            let response: MobileAuthResponse = try await tokenExchangeClient.send(
-                method: "POST",
-                path: runtimeConfiguration.googleTokenExchangePath,
-                body: body
-            )
-
-            guard let nextIdentity = buildIdentity(
-                from: response,
+            try await exchangeGoogleToken(
+                idToken: idToken,
                 fallbackUserId: signInResult.user.userID,
                 fallbackEmail: signInResult.user.profile?.email
-            ) else {
-                let error = AuthError.missingExchangeToken
-                self.lastAuthError = error.localizedDescription
-                throw error
-            }
-            identity = nextIdentity
-            isSignedIn = true
-            persist(identity: nextIdentity)
-            lastAuthError = nil
+            )
         } catch {
             let exchangeError = AuthError.exchangeFailed(String(describing: error))
             lastAuthError = exchangeError.localizedDescription
             throw exchangeError
         }
     }
+    #endif
+
+    /// Signs in with Google on macOS and exchanges the Google ID token for an app token.
+    #if canImport(AppKit)
+    func signInWithGoogle(presentingWindow: NSWindow) async throws {
+        guard let googleClientId = runtimeConfiguration.googleClientId else {
+            throw AuthError.missingGoogleClientId
+        }
+
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: googleClientId)
+
+        let signInResult: GIDSignInResult
+        do {
+            signInResult = try await GIDSignIn.sharedInstance.signIn(withPresenting: presentingWindow)
+        } catch {
+            self.lastAuthError = error.localizedDescription
+            throw error
+        }
+
+        guard let idToken = signInResult.user.idToken?.tokenString else {
+            let error = AuthError.missingGoogleIdToken
+            lastAuthError = error.localizedDescription
+            throw error
+        }
+        guard let tokenAudience = extractJWTAudience(from: idToken), tokenAudience == googleClientId else {
+            let error = AuthError.tokenAudienceMismatch(
+                expectedClientId: googleClientId,
+                actualClientId: extractJWTAudience(from: idToken)
+            )
+            lastAuthError = error.localizedDescription
+            throw error
+        }
+
+        do {
+            try await exchangeGoogleToken(
+                idToken: idToken,
+                fallbackUserId: signInResult.user.userID,
+                fallbackEmail: signInResult.user.profile?.email
+            )
+        } catch {
+            let exchangeError = AuthError.exchangeFailed(String(describing: error))
+            lastAuthError = exchangeError.localizedDescription
+            throw exchangeError
+        }
+    }
+    #endif
 
     /// Stores identity state to local storage.
     ///
@@ -469,14 +519,43 @@ final class AuthService: ObservableObject {
         )
     }
 
+    private func exchangeGoogleToken(
+        idToken: String,
+        fallbackUserId: String?,
+        fallbackEmail: String?
+    ) async throws {
+        let body = try tokenExchangeClient.jsonEncoder.encode(MobileAuthRequest(idToken: idToken))
+        let response: MobileAuthResponse = try await tokenExchangeClient.send(
+            method: "POST",
+            path: runtimeConfiguration.googleTokenExchangePath,
+            body: body
+        )
+
+        guard let nextIdentity = buildIdentity(
+            from: response,
+            fallbackUserId: fallbackUserId,
+            fallbackEmail: fallbackEmail
+        ) else {
+            let error = AuthError.missingExchangeToken
+            self.lastAuthError = error.localizedDescription
+            throw error
+        }
+        identity = nextIdentity
+        isSignedIn = true
+        persist(identity: nextIdentity)
+        lastAuthError = nil
+    }
+
     /// Resolves a usable token from Google auth response payloads.
     private func resolveToken(from response: MobileAuthResponse) -> String? {
-        response.accessToken
-            ?? response.token
-            ?? response.sessionToken
-            ?? response.appToken
-            ?? response.idToken
-            ?? resolveToken(from: response.data)
+        resolveBestToken([
+            response.appToken,
+            response.sessionToken,
+            response.accessToken,
+            response.token,
+            response.idToken,
+            resolveToken(from: response.data)
+        ])
     }
 
     private func resolveRefreshToken(from response: MobileAuthResponse) -> String? {
@@ -486,11 +565,21 @@ final class AuthService: ObservableObject {
 
     private func resolveToken(from response: MobileAuthResponsePayload?) -> String? {
         guard let response else { return nil }
-        return response.accessToken
-            ?? response.token
-            ?? response.sessionToken
-            ?? response.appToken
-            ?? response.idToken
+        return resolveBestToken([
+            response.appToken,
+            response.sessionToken,
+            response.accessToken,
+            response.token,
+            response.idToken
+        ])
+    }
+
+    private func resolveBestToken(_ tokens: [String?]) -> String? {
+        let candidates = tokens.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        if let jwtToken = candidates.first(where: isJwtToken) {
+            return jwtToken
+        }
+        return candidates.first
     }
 
     private func resolveUserId(from response: MobileAuthResponse, fallback: String?) -> String {

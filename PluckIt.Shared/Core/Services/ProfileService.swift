@@ -2,7 +2,7 @@ import Foundation
 
 final class ProfileService {
     private let client: APIClient
-    private let identityPath = "api/user"
+    private let identityPath = "api/profile"
     private let preferencesPath = "api/profile"
 
     init(client: APIClient) {
@@ -10,7 +10,7 @@ final class ProfileService {
     }
 
     func fetchProfile() async throws -> UserProfile {
-        try await client.send(method: "GET", path: "\(identityPath)/me")
+        try await client.send(method: "GET", path: identityPath)
     }
 
     func fetchPreferences() async throws -> UserPreferences {
