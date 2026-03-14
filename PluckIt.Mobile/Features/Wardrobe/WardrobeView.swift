@@ -8,6 +8,7 @@ struct WardrobeView: View {
     @State private var loadingTask: Task<Void, Never>?
     @State private var loadingGeneration = 0
     @State private var errorText: String?
+    @State private var isSessionExpired = false
     @State private var nextToken: String?
     @State private var selectedItem: ClothingItem?
     @State private var searchText = ""
@@ -60,7 +61,11 @@ struct WardrobeView: View {
                     stateLoadingView()
                         .pluckReveal()
                 } else if let errorText {
-                    stateErrorView(errorText: errorText, retryLabel: "Retry wardrobe")
+                    stateErrorView(
+                        errorText: errorText,
+                        retryLabel: "Retry wardrobe",
+                        requiresRelogin: isSessionExpired
+                    )
                         .pluckReveal()
                 } else if items.isEmpty {
                     VStack(spacing: PluckTheme.Spacing.sm) {
@@ -212,6 +217,7 @@ struct WardrobeView: View {
             nextToken = nil
             items = []
             errorText = nil
+            isSessionExpired = false
         }
 
         loadingTask = Task {
@@ -251,10 +257,18 @@ struct WardrobeView: View {
             }
             nextToken = response.nextContinuationToken
             errorText = nil
+            isSessionExpired = false
         } catch {
             guard !isCancellationError(error) else { return }
             guard generation == loadingGeneration else { return }
-            errorText = "Data could not be loaded. Please try again."
+
+            if let apiError = error as? APIClient.ErrorResponse, apiError.statusCode == 401 {
+                isSessionExpired = true
+                errorText = "Session expired, please sign in again."
+            } else {
+                isSessionExpired = false
+                errorText = "Data could not be loaded. Please try again."
+            }
             print("Wardrobe load failed: \(error)")
         }
     }
@@ -294,7 +308,11 @@ struct WardrobeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func stateErrorView(errorText: String, retryLabel: String) -> some View {
+    private func stateErrorView(
+        errorText: String,
+        retryLabel: String,
+        requiresRelogin: Bool
+    ) -> some View {
         VStack(spacing: PluckTheme.Spacing.sm) {
             Text("Wardrobe unavailable")
                 .font(.headline.weight(.semibold))
@@ -304,10 +322,18 @@ struct WardrobeView: View {
                 .foregroundStyle(PluckTheme.mutedText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, PluckTheme.Spacing.lg)
-            Button(retryLabel) {
-                startLoad(refresh: true)
+            if requiresRelogin {
+                Button("Sign in again") {
+                    appServices.authService.signOut()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(PluckTheme.accent)
+            } else {
+                Button(retryLabel) {
+                    startLoad(refresh: true)
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

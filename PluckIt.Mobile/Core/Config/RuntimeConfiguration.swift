@@ -40,12 +40,23 @@ struct RuntimeConfiguration {
 
         func readEnv(_ name: String) -> String? {
             guard let rawValue = env[name] else { return nil }
+            return normalizeConfigValue(rawValue)
+        }
+
+        func normalizeConfigValue(_ rawValue: String?) -> String? {
+            guard let rawValue else { return nil }
             let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
+            guard !trimmed.isEmpty else { return nil }
+            let lowered = trimmed.lowercased()
+            let isTemplateValue =
+                (lowered == "__google_client_id__") ||
+                (lowered == "__google_reversed_client_id__") ||
+                (lowered.hasPrefix("${") && lowered.hasSuffix("}"))
+            return isTemplateValue ? nil : trimmed
         }
 
         func readPlist(_ key: String) -> String? {
-            Bundle.main.object(forInfoDictionaryKey: key) as? String
+            normalizeConfigValue(Bundle.main.object(forInfoDictionaryKey: key) as? String)
         }
 
         func readGooglePlist(_ key: String) -> String? {
@@ -56,7 +67,7 @@ struct RuntimeConfiguration {
                   let dict = raw as? [String: Any] else {
                 return nil
                 }
-                return dict[key] as? String
+                return normalizeConfigValue(dict[key] as? String)
             }
             return readGooglePlistFile("GoogleService-Info.local") ?? readGooglePlistFile("GoogleService-Info")
         }
