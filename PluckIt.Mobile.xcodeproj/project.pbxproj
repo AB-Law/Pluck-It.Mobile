@@ -34,9 +34,33 @@
 		FA50EA612F63FC0200EAC905 /* PluckIt.MobileUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PluckIt.MobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		FA50EB3E2F65853000EAC905 /* Exceptions for "PluckIt.Mobile" folder in "PluckIt.Mobile" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/ML/SegFormerClothes.mlpackage,
+			);
+			target = FA50EA472F63FC0000EAC905 /* PluckIt.Mobile */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		FA50EB402F65853A00EAC905 /* Exceptions for "PluckIt.Mobile" folder in "Copy Bundle Resources" phase from "PluckIt.Mobile" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = FA50EA462F63FC0000EAC905 /* Resources */;
+			membershipExceptions = (
+				Core/ML/SegFormerClothes.mlpackage,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		FA50EA4A2F63FC0000EAC905 /* PluckIt.Mobile */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				FA50EB3E2F65853000EAC905 /* Exceptions for "PluckIt.Mobile" folder in "PluckIt.Mobile" target */,
+				FA50EB402F65853A00EAC905 /* Exceptions for "PluckIt.Mobile" folder in "Copy Bundle Resources" phase from "PluckIt.Mobile" target */,
+			);
 			path = PluckIt.Mobile;
 			sourceTree = "<group>";
 		};
