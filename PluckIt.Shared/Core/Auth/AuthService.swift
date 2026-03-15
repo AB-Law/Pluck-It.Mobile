@@ -65,6 +65,10 @@ final class AuthService: ObservableObject {
     private static let identityStorageKey = "pluckIt.local.identity"
     private static let accessTokenRefreshGracePeriodSeconds: TimeInterval = 60
 
+    /// In-flight refresh task. Concurrent callers await this instead of starting
+    /// a new refresh, preventing rotating-token invalidation races.
+    private var refreshTask: Task<Bool, Never>?
+
     /// Creates the auth service.
     ///
     /// - Parameters:
@@ -274,7 +278,24 @@ final class AuthService: ObservableObject {
     }
 
     /// Refreshes the current access token from the stored refresh token.
+    ///
+    /// Concurrent callers share a single in-flight refresh task to avoid
+    /// racing on a rotating refresh token (which would invalidate each other).
     func refreshSession() async -> Bool {
+        if let existing = refreshTask {
+            return await existing.value
+        }
+
+        let task = Task<Bool, Never> {
+            await self._performRefresh()
+        }
+        refreshTask = task
+        let result = await task.value
+        refreshTask = nil
+        return result
+    }
+
+    private func _performRefresh() async -> Bool {
         guard isSignedIn else { return false }
         guard let currentIdentity = identity else { return false }
         if !currentIdentity.isLocalMock {

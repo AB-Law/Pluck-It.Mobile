@@ -46,23 +46,28 @@ struct MacShellView: View {
                 PluckTheme.background
                     .ignoresSafeArea()
 
-                Group {
-                    switch selection ?? .wardrobe {
-                    case .wardrobe:
-                        MacWardrobeView()
-                    case .vault:
-                        MacVaultView()
-                    case .collections:
-                        MacCollectionsView()
-                    case .discover:
-                        MacDiscoverView()
-                    case .stylist:
-                        MacStylistView()
-                    case .profile:
-                        MacProfileView()
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // All views are kept alive in the hierarchy to preserve their
+                // loaded state (items, images) across tab switches. Opacity
+                // hides inactive tabs without destroying them.
+                let active = selection ?? .wardrobe
+                MacWardrobeView()
+                    .opacity(active == .wardrobe ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacVaultView()
+                    .opacity(active == .vault ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacCollectionsView()
+                    .opacity(active == .collections ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacDiscoverView()
+                    .opacity(active == .discover ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacStylistView()
+                    .opacity(active == .stylist ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacProfileView()
+                    .opacity(active == .profile ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .background(PluckTheme.background)
         }
