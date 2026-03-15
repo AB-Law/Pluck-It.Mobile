@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   test:
-    name: Build and Test
-    runs-on: macos-latest
+    name: Build and Test iOS
+    runs-on: macos-26
     timeout-minutes: 50
 
     defaults:
@@ -54,27 +54,38 @@ jobs:
       - name: Resolve Swift package dependencies
         run: xcodebuild -resolvePackageDependencies -project PluckIt.Mobile.xcodeproj
 
+      - name: Validate Xcode simulator support
+        run: |
+          set -euo pipefail
+          echo "Using Xcode:"
+          xcodebuild -version
+          echo "Available iOS runtimes:"
+          xcrun simctl list runtimes | awk '/iOS/{print}'
+
       - name: Select available iOS simulator
         id: select-simulator
         run: |
           set -euo pipefail
-          SIMULATOR_ID=$(xcrun simctl list devices available \
-            | awk -F'[()]' '/iPhone/{print $2; exit}')
 
-          if [ -z "${SIMULATOR_ID:-}" ]; then
-            SIMULATOR_ID=$(xcrun simctl list devices available \
-              | awk -F'[()]' '/iPad/{print $2; exit}')
-          fi
+          DESIRED_SIMULATOR="iPhone 17 Pro Max"
+          AVAILABLE_SIMULATORS=$(xcrun simctl list devices available \
+            | awk -F'[()]' '/iPhone|iPad/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}')
 
-          if [ -z "${SIMULATOR_ID:-}" ]; then
-            echo "No iPhone/iPad simulator IDs found. Falling back to 'Any iOS Simulator Device'."
-            echo "destination=platform=iOS Simulator,name=Any iOS Simulator Device" >> "$GITHUB_OUTPUT"
+          if printf '%s\n' "$AVAILABLE_SIMULATORS" | grep -qxF "$DESIRED_SIMULATOR"; then
+            echo "destination=platform=iOS Simulator,name=${DESIRED_SIMULATOR},OS=latest" >> "$GITHUB_OUTPUT"
+            echo "Using simulator: ${DESIRED_SIMULATOR}"
             exit 0
           fi
 
-          SIMULATOR_ID="$(echo "$SIMULATOR_ID" | xargs)"
-          echo "destination=platform=iOS Simulator,id=${SIMULATOR_ID}" >> "$GITHUB_OUTPUT"
-          echo "Using simulator id: ${SIMULATOR_ID}"
+          if [ -z "${AVAILABLE_SIMULATORS}" ]; then
+            echo "No iPhone/iPad simulator names found. Falling back to 'Any iOS Simulator Device'."
+            echo "destination=platform=iOS Simulator,name=Any iOS Simulator Device,OS=latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SIMULATOR_NAME="$(printf '%s\n' "$AVAILABLE_SIMULATORS" | head -n 1)"
+          echo "destination=platform=iOS Simulator,name=${SIMULATOR_NAME},OS=latest" >> "$GITHUB_OUTPUT"
+          echo "Using fallback simulator: ${SIMULATOR_NAME}"
 
       - name: Run tests on iOS simulator
         run: |
@@ -94,3 +105,66 @@ jobs:
           name: ios-test-artifacts
           path: |
             build/PluckIt.Mobile.xcresult
+
+  mac-build:
+    name: Build macOS app
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    env:
+      PLUCKIT_API_BASE_URL: ${{ vars.PLUCKIT_API_BASE_URL || 'https://pluckit-prod-api-func.azurewebsites.net' }}
+      PLUCKIT_PROCESSOR_BASE_URL: ${{ vars.PLUCKIT_PROCESSOR_BASE_URL || 'https://pluckit-prod-processor-func.azurewebsites.net' }}
+      PLUCKIT_SKIP_AUTH_HEADER: "true"
+      PLUCKIT_USE_MOCK_AUTH_FALLBACK: "true"
+      PLUCKIT_MOCK_USER_ID: ci-mobile-user
+      PLUCKIT_MOCK_USER_EMAIL: ci-mobile@pluckit.local
+      PLUCKIT_MOCK_USER_NAME: CI Mobile
+      PLUCKIT_TOKEN_RELAY_PATH: "/api/auth/mobile-token"
+      PLUCKIT_LOCAL_AUTH_TOKEN: ${{ secrets.PLUCKIT_LOCAL_AUTH_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache SwiftPM and DerivedData
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData
+          key: >-
+            ios-swiftpm-${{ runner.os }}-${{
+              hashFiles('PluckIt.Mobile.xcodeproj/project.pbxproj')
+            }}-${{
+              hashFiles('PluckIt.Mobile.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved')
+            }}
+          restore-keys: |
+            ios-swiftpm-${{ runner.os }}-
+
+      - name: Resolve Swift package dependencies
+        run: xcodebuild -resolvePackageDependencies -project PluckIt.Mobile.xcodeproj
+
+      - name: Build macOS target
+        run: |
+          xcodebuild \
+            build \
+            -project PluckIt.Mobile.xcodeproj \
+            -scheme PluckIt.Mac \
+            -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
+            -resultBundlePath ./build/PluckIt.Mac.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet
+
+      - name: Collect mac build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-build-artifacts
+          path: |
+            build/PluckIt.Mac.xcresult

@@ -2,15 +2,15 @@ import Foundation
 
 final class ProfileService {
     private let client: APIClient
-    private let identityPath = "api/user"
-    private let preferencesPath = "api/profile"
+    private let identityPath = "api/profile"
+    private let preferencesPath = "api/profile/preferences"
 
     init(client: APIClient) {
         self.client = client
     }
 
     func fetchProfile() async throws -> UserProfile {
-        try await client.send(method: "GET", path: "\(identityPath)/me")
+        try await client.send(method: "GET", path: identityPath)
     }
 
     func fetchPreferences() async throws -> UserPreferences {

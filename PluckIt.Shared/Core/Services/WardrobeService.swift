@@ -94,7 +94,7 @@ final class WardrobeService {
     }
 
     func dismissDraft(_ draftId: String) async throws {
-        try await client.sendVoid(method: "DELETE", path: "\(basePath)/\(draftId)")
+        try await client.sendVoid(method: "DELETE", path: "\(basePath)/drafts/\(draftId)")
     }
 
     /// Deletes a saved wardrobe item from the main archive.

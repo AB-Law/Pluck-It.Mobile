@@ -106,15 +106,15 @@ struct RuntimeConfiguration {
         let apiUrlValue = readEnv("PLUCKIT_API_BASE_URL")
             ?? readEnv("PLUCKIT_API_URL")
             ?? readPlist("PluckItApiBaseURL")
-            ?? "http://127.0.0.1:7072"
+            ?? "https://pluckit-prod-api-func.azurewebsites.net"
 
         let processorUrlValue = readEnv("PLUCKIT_PROCESSOR_BASE_URL")
             ?? readEnv("PLUCKIT_CHAT_API_URL")
             ?? readPlist("PluckItProcessorBaseURL")
-            ?? "http://127.0.0.1:7071"
+            ?? "https://pluckit-prod-processor-func.azurewebsites.net"
 
-        self.apiBaseUrl = URL(string: normalizeUrl(apiUrlValue)) ?? URL(string: "http://127.0.0.1:7072")!
-        self.processorBaseUrl = URL(string: normalizeUrl(processorUrlValue)) ?? URL(string: "http://127.0.0.1:7071")!
+        self.apiBaseUrl = URL(string: normalizeUrl(apiUrlValue)) ?? URL(string: "https://pluckit-prod-api-func.azurewebsites.net")!
+        self.processorBaseUrl = URL(string: normalizeUrl(processorUrlValue)) ?? URL(string: "https://pluckit-prod-processor-func.azurewebsites.net")!
         let mockUserId = readEnv("PLUCKIT_MOCK_USER_ID") ?? readEnv("PLUCKIT_LOCAL_USER_ID")
         let mockUserEmail = readEnv("PLUCKIT_MOCK_USER_EMAIL") ?? readEnv("PLUCKIT_LOCAL_USER_EMAIL")
         let mockToken = readEnv("PLUCKIT_MOCK_TOKEN") ?? readEnv("PLUCKIT_LOCAL_AUTH_TOKEN")

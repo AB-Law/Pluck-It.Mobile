@@ -1,6 +1,6 @@
 import Foundation
 
-/// Identity/fingerprint data returned by GET api/user/me
+/// Identity/fingerprint data returned by GET api/profile
 struct UserProfile: Codable {
     let userId: String?
     let email: String?

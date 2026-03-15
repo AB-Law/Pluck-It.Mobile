@@ -161,7 +161,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
     let userId: String?
     let estimatedMarketValue: Double?
     let lastWornAt: String?
-    let wearEvents: [WearEvent]?
+    let wearEvents: [WearEvent]
     let draftCreatedAt: String?
     let draftUpdatedAt: String?
     let isWishlisted: Bool
@@ -245,7 +245,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         userId: String? = nil,
         estimatedMarketValue: Double? = nil,
         lastWornAt: String? = nil,
-        wearEvents: [WearEvent]? = nil,
+        wearEvents: [WearEvent] = [],
         draftCreatedAt: String? = nil,
         draftUpdatedAt: String? = nil,
         isWishlisted: Bool = false
@@ -271,7 +271,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         self.userId = userId
         self.estimatedMarketValue = estimatedMarketValue
         self.lastWornAt = lastWornAt
-        self.wearEvents = wearEvents ?? []
+        self.wearEvents = wearEvents
         self.draftCreatedAt = draftCreatedAt
         self.draftUpdatedAt = draftUpdatedAt
         self.isWishlisted = isWishlisted
@@ -349,10 +349,16 @@ struct WardrobePagedResponse: Codable {
         self.nextContinuationToken = nextContinuationToken
     }
 
-    init(from decoder: Decoder) throws {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.items = try container.decodeIfPresent([ClothingItem].self, forKey: .items) ?? []
         self.nextContinuationToken = try container.decodeIfPresent(String.self, forKey: .nextContinuationToken)
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(items, forKey: .items)
+        try container.encodeIfPresent(nextContinuationToken, forKey: .nextContinuationToken)
     }
 }
 
