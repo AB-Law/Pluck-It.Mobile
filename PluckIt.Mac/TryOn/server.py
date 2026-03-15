@@ -15,8 +15,11 @@ Endpoints:
 import sys
 import os
 import io
+import json
+import time
 import threading
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ── Paths injected by the Swift launcher ──────────────────────────────────────
@@ -24,6 +27,8 @@ REPO_DIR    = os.environ.get("TRYON_REPO_DIR", "")
 WEIGHTS_DIR = Path(os.environ.get("TRYON_WEIGHTS_DIR",
                    Path.home() / "Library/Application Support/PluckIt/tryon/weights"))
 CATVTON_DIR = WEIGHTS_DIR / "catvton"
+SUPPORT_DIR = WEIGHTS_DIR.parent          # ~/Library/Application Support/PluckIt/tryon
+METRICS_LOG = SUPPORT_DIR / "metrics.jsonl"
 
 # Add cloned CatVTON repo to import path so `from model.pipeline import …` works
 if REPO_DIR:
@@ -52,11 +57,12 @@ _load_error    = None   # surfaced through /health if loading fails
 # float16 halves memory vs float32; bfloat16 is more numerically stable on MPS
 _weight_dtype  = torch.bfloat16 if torch.backends.mps.is_available() else torch.float16
 
-# Allow MPS to use up to 80% of unified memory for the inference pass.
+# Allow MPS to use unified memory without a hard cap
 if torch.backends.mps.is_available():
-    os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")  # no hard cap
+    os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
 
 INFER_H, INFER_W = 768, 576
+SCHEDULER_NAME   = "DPMSolverMultistep+Karras"
 
 
 def _fit_and_pad(img: Image.Image, w: int, h: int, bg: tuple = (255, 255, 255)) -> Image.Image:
@@ -68,9 +74,20 @@ def _fit_and_pad(img: Image.Image, w: int, h: int, bg: tuple = (255, 255, 255)) 
     canvas.paste(img, (x, y))
     return canvas
 
+
 # ── Labels produced by mattmdjaga/segformer_b2_clothes ───────────────────────
 _UPPER_LABELS  = {"Upper-clothes", "Coat", "Jacket", "Shirt", "Dress", "Blouse"}
 _LOWER_LABELS  = {"Pants", "Skirt", "Shorts", "Leggings"}
+
+
+# ── Metrics ───────────────────────────────────────────────────────────────────
+
+def _write_metric(record: dict) -> None:
+    try:
+        with open(METRICS_LOG, "a") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception as e:
+        log.warning(f"Could not write metrics: {e}")
 
 
 # ── Model loading (called once in a background thread) ───────────────────────
@@ -78,8 +95,9 @@ _LOWER_LABELS  = {"Pants", "Skirt", "Shorts", "Leggings"}
 def _load_models() -> None:
     global _pipeline, _seg_pipeline, _load_error
 
+    t0 = time.perf_counter()
     try:
-        log.info(f"Device: {_device}")
+        log.info(f"Device: {_device}  dtype: {_weight_dtype}")
 
         log.info("Loading cloth-segmentation model…")
         from transformers import pipeline as hf_pipeline
@@ -101,7 +119,26 @@ def _load_models() -> None:
             skip_safety_check=True,
         )
 
-        log.info("All models ready.")
+        # ── Swap to DPM++ 2M Karras: same quality in ~20 steps vs DDIM's 30 ──
+        from diffusers import DPMSolverMultistepScheduler
+        _pipeline.noise_scheduler = DPMSolverMultistepScheduler.from_config(
+            _pipeline.noise_scheduler.config,
+            use_karras_sigmas=True,
+        )
+        log.info("Scheduler: DPMSolverMultistep (Karras)")
+
+        elapsed = time.perf_counter() - t0
+        log.info(f"All models ready in {elapsed:.1f}s.")
+        _write_metric({
+            "event":          "model_load",
+            "timestamp":      datetime.now(timezone.utc).isoformat(),
+            "load_time_s":    round(elapsed, 2),
+            "device":         _device,
+            "dtype":          str(_weight_dtype),
+            "scheduler":      SCHEDULER_NAME,
+            "infer_res":      f"{INFER_W}x{INFER_H}",
+            "attn_chunk":     1024,
+        })
 
     except Exception:
         import traceback
@@ -147,10 +184,12 @@ def _generate_mask(person_image: Image.Image, cloth_type: str) -> Image.Image:
 @app.route("/health")
 def health():
     return jsonify({
-        "status": "ok",
-        "ready": _pipeline is not None,
-        "device": _device,
-        "error": _load_error,
+        "status":    "ok",
+        "ready":     _pipeline is not None,
+        "device":    _device,
+        "scheduler": SCHEDULER_NAME,
+        "res":       f"{INFER_W}x{INFER_H}",
+        "error":     _load_error,
     })
 
 
@@ -163,7 +202,7 @@ def try_on():
         return jsonify({"error": "Multipart fields person_image and garment_image are required."}), 400
 
     cloth_type   = request.form.get("cloth_type", "upper")
-    num_steps    = int(request.form.get("num_steps", 30))
+    num_steps    = int(request.form.get("num_steps", 20))     # 20 steps with DPM++ ≈ 30 DDIM
     guidance     = float(request.form.get("guidance_scale", 3.5))
     seed         = int(request.form.get("seed", 42))
 
@@ -181,10 +220,15 @@ def try_on():
     person_image  = _fit_and_pad(person_image,  INFER_W, INFER_H)
     garment_image = _fit_and_pad(garment_image, INFER_W, INFER_H)
 
+    t_seg = time.perf_counter()
     log.info(f"Generating mask (cloth_type={cloth_type})…")
     mask = _generate_mask(person_image, cloth_type)
+    seg_time = time.perf_counter() - t_seg
+    log.info(f"Mask generated in {seg_time:.2f}s")
 
-    log.info(f"Running inference (steps={num_steps}, guidance={guidance}, seed={seed}, size={INFER_W}×{INFER_H})…")
+    log.info(f"Running inference (steps={num_steps}, guidance={guidance}, seed={seed}, "
+             f"size={INFER_W}×{INFER_H}, scheduler=DPM++Karras)…")
+    t_infer = time.perf_counter()
     with _lock:
         generator = torch.Generator(device=_device).manual_seed(seed)
         with torch.inference_mode():
@@ -201,7 +245,31 @@ def try_on():
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
 
-    log.info("Inference complete.")
+    infer_time = time.perf_counter() - t_infer
+    total_time = seg_time + infer_time
+    sps        = infer_time / num_steps
+
+    log.info(f"Inference complete in {infer_time:.1f}s  "
+             f"({sps:.2f}s/step, {num_steps} steps)  "
+             f"total={total_time:.1f}s")
+
+    _write_metric({
+        "event":          "inference",
+        "timestamp":      datetime.now(timezone.utc).isoformat(),
+        "cloth_type":     cloth_type,
+        "num_steps":      num_steps,
+        "guidance_scale": guidance,
+        "seed":           seed,
+        "res":            f"{INFER_W}x{INFER_H}",
+        "scheduler":      SCHEDULER_NAME,
+        "attn_chunk":     1024,
+        "seg_time_s":     round(seg_time,   2),
+        "infer_time_s":   round(infer_time, 2),
+        "total_time_s":   round(total_time, 2),
+        "s_per_step":     round(sps,        2),
+        "device":         _device,
+    })
+
     buf = io.BytesIO()
     result.save(buf, format="PNG")
     buf.seek(0)

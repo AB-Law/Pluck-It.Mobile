@@ -15,7 +15,7 @@ struct MacTryOnService {
         personImageData: Data,
         garmentImageData: Data,
         clothType: ClothType = .upper,
-        numSteps: Int = 50
+        numSteps: Int = 20
     ) async throws -> Data {
         let url = URL(string: "http://127.0.0.1:\(port)/try-on")!
         var request = URLRequest(url: url)
