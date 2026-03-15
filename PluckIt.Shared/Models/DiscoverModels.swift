@@ -71,11 +71,11 @@ struct ScraperSource: Codable, Equatable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+        id = try container.decode(String.self, forKey: .id)
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         sourceType = try container.decodeIfPresent(String.self, forKey: .sourceType) ?? ""
         isGlobal = try container.decodeIfPresent(Bool.self, forKey: .isGlobal) ?? false
-        isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
         config = try container.decodeIfPresent([String: DynamicJSONValue].self, forKey: .config)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         lastScrapedAt = try container.decodeIfPresent(String.self, forKey: .lastScrapedAt)

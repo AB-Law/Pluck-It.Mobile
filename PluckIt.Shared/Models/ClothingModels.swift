@@ -161,7 +161,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
     let userId: String?
     let estimatedMarketValue: Double?
     let lastWornAt: String?
-    let wearEvents: [WearEvent]?
+    let wearEvents: [WearEvent]
     let draftCreatedAt: String?
     let draftUpdatedAt: String?
     let isWishlisted: Bool
@@ -245,7 +245,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         userId: String? = nil,
         estimatedMarketValue: Double? = nil,
         lastWornAt: String? = nil,
-        wearEvents: [WearEvent]? = nil,
+        wearEvents: [WearEvent] = [],
         draftCreatedAt: String? = nil,
         draftUpdatedAt: String? = nil,
         isWishlisted: Bool = false
@@ -271,7 +271,7 @@ struct ClothingItem: Codable, Equatable, StringSearchableItem, Identifiable {
         self.userId = userId
         self.estimatedMarketValue = estimatedMarketValue
         self.lastWornAt = lastWornAt
-        self.wearEvents = wearEvents ?? []
+        self.wearEvents = wearEvents
         self.draftCreatedAt = draftCreatedAt
         self.draftUpdatedAt = draftUpdatedAt
         self.isWishlisted = isWishlisted

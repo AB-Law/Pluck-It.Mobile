@@ -52,7 +52,11 @@ struct MacTryOnService {
         guard let urlString, let url = URL(string: urlString) else {
             throw TryOnError.inferenceFailed("Garment has no image URL.")
         }
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw TryOnError.inferenceFailed("Failed to download garment image: HTTP \(statusCode)")
+        }
         return data
     }
 }

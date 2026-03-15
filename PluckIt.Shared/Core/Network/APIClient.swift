@@ -30,19 +30,19 @@ final class APIClient {
         self.debugLoggingEnabled = debugLoggingEnabled
     }
 
-    lazy var jsonEncoder: JSONEncoder = {
+    func makeJSONEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.keyEncodingStrategy = .convertToSnakeCase
         return encoder
-    }()
+    }
 
-    lazy var jsonDecoder: JSONDecoder = {
+    func makeJSONDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
-    }()
+    }
 
     /// Sends a request and decodes the response payload.
     func send<T: Decodable>(
@@ -104,7 +104,7 @@ final class APIClient {
             }
 
             do {
-                return try jsonDecoder.decode(T.self, from: data)
+                return try makeJSONDecoder().decode(T.self, from: data)
             } catch {
                 logDecodeFailure(type: String(describing: T.self), url: url, body: bodyText, error: error)
                 throw error
@@ -271,7 +271,7 @@ final class APIClient {
                 throw ErrorResponse(statusCode: httpResponse.statusCode, body: bodyText, requestURL: url)
             }
             do {
-                return try jsonDecoder.decode(T.self, from: data)
+                return try makeJSONDecoder().decode(T.self, from: data)
             } catch {
                 logDecodeFailure(type: String(describing: T.self), url: url, body: bodyText, error: error)
                 throw error
@@ -392,14 +392,14 @@ final class APIClient {
             payload += String(repeating: "=", count: 4 - payload.count % 4)
         }
         guard let payloadData = Data(base64Encoded: payload, options: .ignoreUnknownCharacters),
-              let json = try? JSONSerialization.jsonObject(with: payloadData, options: []),
-              let payloadData = json as? [String: Any] else {
+              let jsonObject = try? JSONSerialization.jsonObject(with: payloadData, options: []),
+              let payloadDict = jsonObject as? [String: Any] else {
             return nil
         }
-        if let aud = payloadData["aud"] as? String {
+        if let aud = payloadDict["aud"] as? String {
             return aud
         }
-        if let audList = payloadData["aud"] as? [String], let first = audList.first {
+        if let audList = payloadDict["aud"] as? [String], let first = audList.first {
             return first
         }
         return nil

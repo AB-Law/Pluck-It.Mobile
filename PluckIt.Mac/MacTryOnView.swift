@@ -16,6 +16,7 @@ struct MacTryOnView: View {
     @State private var selectedGarment:   ClothingItem?
     @State private var garmentFilter:     GarmentFilter = .all
     @State private var isLoadingGarments  = false
+    @State private var loadError: String?
 
     // Inference
     @State private var clothType:         ClothType = .upper
@@ -142,6 +143,11 @@ struct MacTryOnView: View {
 
                 if isLoadingGarments {
                     ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let loadError {
+                    Text(loadError)
+                        .font(PluckTheme.Typography.terminalBody)
+                        .foregroundStyle(PluckTheme.danger)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if garments.isEmpty {
                     Text("No items found")
@@ -553,11 +559,22 @@ struct MacTryOnView: View {
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = "tryon_result.png"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? data.write(to: url)
+        do {
+            try data.write(to: url)
+        } catch {
+            print("[MacTryOnView] Failed to save try-on result: \(error)")
+            let alert = NSAlert()
+            alert.messageText = "Failed to Save Image"
+            alert.informativeText = "Could not save image to disk.\n\(error.localizedDescription)"
+            alert.alertStyle = .critical
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
 
     private func loadGarments() async {
         isLoadingGarments = true
+        loadError = nil
         defer { isLoadingGarments = false }
 
         let includeWishlisted: Bool? = {
@@ -568,11 +585,16 @@ struct MacTryOnView: View {
             }
         }()
 
-        if let response = try? await appServices.wardrobeService.fetchItems(
-            pageSize: 100,
-            includeWishlisted: includeWishlisted
-        ) {
+        do {
+            let response = try await appServices.wardrobeService.fetchItems(
+                pageSize: 100,
+                includeWishlisted: includeWishlisted
+            )
             garments = response.items.filter { $0.imageUrl != nil || $0.rawImageBlobUrl != nil }
+            loadError = nil
+        } catch {
+            print("[MacTryOnView] Failed to load garments: \(error)")
+            loadError = error.localizedDescription
         }
     }
 

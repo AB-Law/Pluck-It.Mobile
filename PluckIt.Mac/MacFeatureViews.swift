@@ -727,6 +727,8 @@ private struct MacUploadQueueSheet: View {
     let onRetryDraft: (WardrobeUploadDraft) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var draftActionError: String?
+    @State private var showingDraftActionError = false
 
     var body: some View {
         NavigationStack {
@@ -751,22 +753,13 @@ private struct MacUploadQueueSheet: View {
 
                             HStack {
                                 Button("Accept") {
-                                    Task {
-                                        try? await onAcceptDraft(draft)
-                                        await onRefreshDrafts()
-                                    }
+                                    Task { await handleDraftAction("Accept", action: onAcceptDraft, draft: draft) }
                                 }
                                 Button("Reject", role: .destructive) {
-                                    Task {
-                                        try? await onRejectDraft(draft)
-                                        await onRefreshDrafts()
-                                    }
+                                    Task { await handleDraftAction("Reject", action: onRejectDraft, draft: draft) }
                                 }
                                 Button("Retry") {
-                                    Task {
-                                        try? await onRetryDraft(draft)
-                                        await onRefreshDrafts()
-                                    }
+                                    Task { await handleDraftAction("Retry", action: onRetryDraft, draft: draft) }
                                 }
                             }
                             .buttonStyle(.bordered)
@@ -786,6 +779,31 @@ private struct MacUploadQueueSheet: View {
                 }
             }
             .frame(minWidth: 780, minHeight: 480)
+        }
+        .alert("Draft action failed", isPresented: $showingDraftActionError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(draftActionError ?? "An unknown error occurred.")
+        }
+    }
+
+    private func handleDraftAction(
+        _ actionName: String,
+        action: @escaping (WardrobeUploadDraft) async throws -> Void,
+        draft: WardrobeUploadDraft
+    ) async {
+        defer {
+            Task { await onRefreshDrafts() }
+        }
+        do {
+            try await action(draft)
+        } catch {
+            let message = "\(actionName) draft failed: \(error.localizedDescription)"
+            print("[MacUploadQueueSheet] \(message)")
+            await MainActor.run {
+                draftActionError = message
+                showingDraftActionError = true
+            }
         }
     }
 }

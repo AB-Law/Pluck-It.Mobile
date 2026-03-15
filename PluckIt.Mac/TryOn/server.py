@@ -202,9 +202,24 @@ def try_on():
         return jsonify({"error": "Multipart fields person_image and garment_image are required."}), 400
 
     cloth_type   = request.form.get("cloth_type", "upper")
-    num_steps    = int(request.form.get("num_steps", 20))     # 20 steps with DPM++ ≈ 30 DDIM
-    guidance     = float(request.form.get("guidance_scale", 3.5))
-    seed         = int(request.form.get("seed", 42))
+    num_steps_raw = request.form.get("num_steps", 30)
+    guidance_raw = request.form.get("guidance_scale", 3.5)
+    seed_raw = request.form.get("seed", 42)
+
+    try:
+        num_steps = int(num_steps_raw)
+    except (TypeError, ValueError):
+        return jsonify({"error": f"Invalid num_steps value: {num_steps_raw}"}), 400
+
+    try:
+        guidance = float(guidance_raw)
+    except (TypeError, ValueError):
+        return jsonify({"error": f"Invalid guidance_scale value: {guidance_raw}"}), 400
+
+    try:
+        seed = int(seed_raw)
+    except (TypeError, ValueError):
+        return jsonify({"error": f"Invalid seed value: {seed_raw}"}), 400
 
     person_bytes  = request.files["person_image"].read()
     garment_bytes = request.files["garment_image"].read()

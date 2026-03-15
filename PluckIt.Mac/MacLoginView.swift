@@ -192,7 +192,7 @@ struct MacLoginView: View {
             print("[MacLogin] Google sign-in failed")
             print("[MacLogin] description: \(error.localizedDescription)")
             print("[MacLogin] domain: \(nsError.domain)")
-            print("[MacLogin: code: \(nsError.code)")
+            print("[MacLogin] code: \(nsError.code)")
             print("[MacLogin] userInfo: \(nsError.userInfo)")
             errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

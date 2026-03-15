@@ -3,7 +3,7 @@ import Foundation
 final class ProfileService {
     private let client: APIClient
     private let identityPath = "api/profile"
-    private let preferencesPath = "api/profile"
+    private let preferencesPath = "api/profile/preferences"
 
     init(client: APIClient) {
         self.client = client

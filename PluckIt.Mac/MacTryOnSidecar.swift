@@ -15,7 +15,7 @@ enum TryOnError: LocalizedError {
         case .python3NotFound:
             return "Python 3 not found. Install Xcode Command Line Tools (xcode-select --install)."
         case .serverStartTimeout:
-            return "The CatVTON server didn't respond within 3 minutes. Check Console logs for details."
+            return "The CatVTON server didn't respond within 5 minutes. Check Console logs for details."
         case .setupStepFailed(let msg):
             return "First-run setup failed: \(msg)"
         case .inferenceFailed(let msg):
@@ -82,6 +82,7 @@ final class MacTryOnSidecar: ObservableObject {
     // MARK: Config
 
     private let port = 7433
+    private let serverStartTimeoutSeconds: TimeInterval = 300
 
     // MARK: Paths
 
@@ -243,8 +244,14 @@ print("seg model cached", flush=True)
         ]
 
         // Route stdout + stderr to a log file for debugging
-        let logHandle = FileHandle(forWritingAtPath: logFile.path)
-            ?? { FileManager.default.createFile(atPath: logFile.path, contents: nil); return FileHandle(forWritingAtPath: logFile.path)! }()
+        let logHandle: FileHandle = {
+            FileManager.default.createFile(atPath: logFile.path, contents: nil)
+            guard let handle = FileHandle(forWritingAtPath: logFile.path) else {
+                print("[MacTryOnSidecar] Unable to open log file at \(logFile.path); using standardError.")
+                return FileHandle.standardError
+            }
+            return handle
+        }()
         process.standardOutput = logHandle
         process.standardError  = logHandle
 
@@ -264,7 +271,7 @@ print("seg model cached", flush=True)
 
     private func waitForReady() async throws {
         let healthURL = URL(string: "http://127.0.0.1:\(port)/health")!
-        let deadline  = Date().addingTimeInterval(300) // 5 min — model load takes a while
+        let deadline  = Date().addingTimeInterval(serverStartTimeoutSeconds)
 
         while Date() < deadline {
             // Fail fast if the process already died

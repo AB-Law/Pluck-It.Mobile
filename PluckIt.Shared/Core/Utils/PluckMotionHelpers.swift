@@ -36,14 +36,28 @@ extension View {
 }
 
 /// Triggers a subtle haptic cue for press and action confirmation.
+enum PluckHapticStyle {
+    case light
+    case medium
+    case heavy
+}
+
 #if canImport(UIKit)
-func pluckImpactFeedback(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
-    let generator = UIImpactFeedbackGenerator(style: style)
+func pluckImpactFeedback(_ style: PluckHapticStyle = .light) {
+    let generatorStyle: UIImpactFeedbackGenerator.FeedbackStyle = {
+        switch style {
+        case .light: return .light
+        case .medium: return .medium
+        case .heavy: return .heavy
+        }
+    }()
+    let generator = UIImpactFeedbackGenerator(style: generatorStyle)
     generator.prepare()
     generator.impactOccurred()
 }
 #else
-func pluckImpactFeedback() {
+func pluckImpactFeedback(_ style: PluckHapticStyle = .light) {
+    _ = style
     NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
 }
 #endif

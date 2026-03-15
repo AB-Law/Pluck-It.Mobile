@@ -207,7 +207,7 @@ final class AuthService: ObservableObject {
                 refreshToken: currentIdentity.refreshToken,
                 userId: currentIdentity.userId
             )
-            let body = try tokenExchangeClient.jsonEncoder.encode(request)
+            let body = try tokenExchangeClient.makeJSONEncoder().encode(request)
             _ = try await tokenExchangeClient.sendVoid(
                 method: "POST",
                 path: runtimeConfiguration.googleTokenRevokePath,
@@ -366,7 +366,7 @@ final class AuthService: ObservableObject {
         }
 
         do {
-            let body = try tokenExchangeClient.jsonEncoder.encode(
+            let body = try tokenExchangeClient.makeJSONEncoder().encode(
                 MobileAuthRefreshRequest(refreshToken: refreshToken)
             )
             let response: MobileAuthResponse = try await tokenExchangeClient.send(
@@ -563,8 +563,14 @@ final class AuthService: ObservableObject {
     ///
     /// - Parameter identity: The identity object to persist.
     func persist(identity: AppIdentity) {
-        if let data = try? JSONEncoder().encode(identity) {
+        do {
+            let data = try JSONEncoder().encode(identity)
             UserDefaults.standard.setValue(data.base64EncodedString(), forKey: Self.identityStorageKey)
+            #if DEBUG
+            print("[Auth] Persisted identity for \(identity.userId) into \(Self.identityStorageKey).")
+            #endif
+        } catch {
+            print("[Auth] Failed to persist identity for \(identity.userId) into \(Self.identityStorageKey): \(error)")
         }
     }
 
@@ -595,7 +601,7 @@ final class AuthService: ObservableObject {
         fallbackUserId: String?,
         fallbackEmail: String?
     ) async throws {
-        let body = try tokenExchangeClient.jsonEncoder.encode(MobileAuthRequest(idToken: idToken))
+        let body = try tokenExchangeClient.makeJSONEncoder().encode(MobileAuthRequest(idToken: idToken))
         let response: MobileAuthResponse = try await tokenExchangeClient.send(
             method: "POST",
             path: runtimeConfiguration.googleTokenExchangePath,
