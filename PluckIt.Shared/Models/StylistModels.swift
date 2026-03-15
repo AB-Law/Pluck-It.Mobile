@@ -33,7 +33,7 @@ struct StylistChatRequest: Codable, Equatable {
         self.traceId = traceId
     }
 
-    init(from decoder: Decoder) throws {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         message = try container.decode(String.self, forKey: .message)
         recentMessages = try container.decode([StylistMessage].self, forKey: .recent_messages)
@@ -41,7 +41,7 @@ struct StylistChatRequest: Codable, Equatable {
         traceId = try container.decode(String.self, forKey: .trace_id)
     }
 
-    func encode(to encoder: Encoder) throws {
+    nonisolated func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(message, forKey: .message)
         try container.encode(recentMessages, forKey: .recent_messages)
@@ -130,7 +130,7 @@ enum StylistChatEvent: Codable, Equatable {
         case tool_latency_ms
     }
 
-    init(from decoder: Decoder) throws {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
         let traceId = try container.decodeIfPresent(String.self, forKey: .traceId)
@@ -216,7 +216,7 @@ enum StylistChatEvent: Codable, Equatable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
+    nonisolated func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case let .token(content, traceId, runId, model, tokenCount, toolLatencyMs):
@@ -346,7 +346,7 @@ enum StylistChatEvent: Codable, Equatable {
         }
     }
 
-    private static func decodeInt(_ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Int? {
+    private static nonisolated func decodeInt(_ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Int? {
         if let intValue = try? container.decodeIfPresent(Int.self, forKey: key) {
             return intValue
         }

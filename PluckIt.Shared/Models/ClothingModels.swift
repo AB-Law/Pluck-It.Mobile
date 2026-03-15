@@ -349,10 +349,16 @@ struct WardrobePagedResponse: Codable {
         self.nextContinuationToken = nextContinuationToken
     }
 
-    init(from decoder: Decoder) throws {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.items = try container.decodeIfPresent([ClothingItem].self, forKey: .items) ?? []
         self.nextContinuationToken = try container.decodeIfPresent(String.self, forKey: .nextContinuationToken)
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(items, forKey: .items)
+        try container.encodeIfPresent(nextContinuationToken, forKey: .nextContinuationToken)
     }
 }
 

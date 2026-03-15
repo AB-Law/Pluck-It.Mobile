@@ -156,6 +156,9 @@ jobs:
             -scheme PluckIt.Mac \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
             -resultBundlePath ./build/PluckIt.Mac.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             -quiet
 
       - name: Collect mac build artifacts

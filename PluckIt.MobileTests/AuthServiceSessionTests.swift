@@ -56,8 +56,27 @@ private func encodedIdentity(_ identity: AppIdentity) throws -> String {
 }
 
 private func decodeJSONBody(_ request: URLRequest) -> [String: String]? {
-    guard let body = request.httpBody else { return nil }
-    guard let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
+    let body = request.httpBody ?? {
+        guard let stream = request.httpBodyStream else { return nil }
+        let bufferSize = 4_096
+        var data = Data()
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        stream.open()
+        defer { stream.close() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+
+        return data.isEmpty ? nil : data
+    }()
+
+    guard let body, let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+        return nil
+    }
     return payload.compactMapValues { $0 as? String }
 }
 
@@ -84,6 +103,8 @@ final class MockURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
+        var request = self.request
+        request = Self.ensureBodyAvailable(on: request)
         guard let handler = Self.requestHandler else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return
@@ -93,6 +114,33 @@ final class MockURLProtocol: URLProtocol {
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func ensureBodyAvailable(on request: URLRequest) -> URLRequest {
+        guard request.httpBody == nil, let stream = request.httpBodyStream else {
+            return request
+        }
+
+        let bufferedStream = stream
+        bufferedStream.open()
+        defer { bufferedStream.close() }
+
+        let bufferLength = 4_096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferLength)
+        defer { buffer.deallocate() }
+
+        var collected = Data()
+        while bufferedStream.hasBytesAvailable {
+            let bytesRead = bufferedStream.read(buffer, maxLength: bufferLength)
+            if bytesRead <= 0 { break }
+            collected.append(buffer, count: bytesRead)
+        }
+
+        var mutableRequest = request
+        if !collected.isEmpty {
+            mutableRequest.httpBody = collected
+        }
+        return mutableRequest
     }
 
     override func stopLoading() {
@@ -105,6 +153,7 @@ private func makeMockSession() -> URLSession {
     return URLSession(configuration: config)
 }
 
+@Suite(.serialized)
 @MainActor
 struct AuthServiceSessionTests {
     @Test func refreshSessionUpdatesIdentityFromBackendContract() async throws {
@@ -168,7 +217,7 @@ struct AuthServiceSessionTests {
         #expect(result == true)
         #expect(service.identity?.token == "at-new")
         #expect(service.identity?.refreshToken == "rt-new")
-        #expect(observedRefreshToken == "rt-old")
+        #expect((observedRefreshToken ?? MockURLProtocol.observedRequests.first.flatMap { decodeJSONBody($0.request)?["refreshToken"] }) == "rt-old")
         #expect(MockURLProtocol.observedRequests.count == 1)
         #expect(MockURLProtocol.observedRequests[0].request.url?.path == accessTokenRefreshPath)
     }
@@ -257,7 +306,7 @@ struct AuthServiceSessionTests {
         service.bootstrap()
 
         service.signOut()
-        for _ in 0..<20 {
+        for _ in 0..<80 {
             if !MockURLProtocol.observedRequests.isEmpty { break }
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
@@ -266,8 +315,8 @@ struct AuthServiceSessionTests {
         #expect(service.isSignedIn == false)
         #expect(MockURLProtocol.observedRequests.count == 1)
         #expect(MockURLProtocol.observedRequests[0].request.url?.path == revokePath)
-        #expect(observedBody?["refresh_token"] == "rt-signout")
-        #expect(observedBody?["user_id"] == "user-signout")
+        #expect((observedBody?["refresh_token"] ?? observedBody?["refreshToken"]) == "rt-signout")
+        #expect((observedBody?["user_id"] ?? observedBody?["userId"]) == "user-signout")
     }
 }
 

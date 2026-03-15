@@ -16,6 +16,56 @@ struct AppIdentity: Codable, Equatable {
     let accessTokenExpiresAt: Date?
     let refreshTokenExpiresAt: Date?
     let isLocalMock: Bool
+
+    init(
+        userId: String,
+        email: String?,
+        token: String?,
+        refreshToken: String?,
+        accessTokenExpiresAt: Date?,
+        refreshTokenExpiresAt: Date?,
+        isLocalMock: Bool
+    ) {
+        self.userId = userId
+        self.email = email
+        self.token = token
+        self.refreshToken = refreshToken
+        self.accessTokenExpiresAt = accessTokenExpiresAt
+        self.refreshTokenExpiresAt = refreshTokenExpiresAt
+        self.isLocalMock = isLocalMock
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case userId
+        case email
+        case token
+        case refreshToken
+        case accessTokenExpiresAt
+        case refreshTokenExpiresAt
+        case isLocalMock
+    }
+
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.userId = try container.decode(String.self, forKey: .userId)
+        self.email = try container.decodeIfPresent(String.self, forKey: .email)
+        self.token = try container.decodeIfPresent(String.self, forKey: .token)
+        self.refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken)
+        self.accessTokenExpiresAt = try container.decodeIfPresent(Date.self, forKey: .accessTokenExpiresAt)
+        self.refreshTokenExpiresAt = try container.decodeIfPresent(Date.self, forKey: .refreshTokenExpiresAt)
+        self.isLocalMock = try container.decode(Bool.self, forKey: .isLocalMock)
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(userId, forKey: .userId)
+        try container.encodeIfPresent(email, forKey: .email)
+        try container.encodeIfPresent(token, forKey: .token)
+        try container.encodeIfPresent(refreshToken, forKey: .refreshToken)
+        try container.encodeIfPresent(accessTokenExpiresAt, forKey: .accessTokenExpiresAt)
+        try container.encodeIfPresent(refreshTokenExpiresAt, forKey: .refreshTokenExpiresAt)
+        try container.encode(isLocalMock, forKey: .isLocalMock)
+    }
 }
 
 /// Authentication facade used by API clients and services.
