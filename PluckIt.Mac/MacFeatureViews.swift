@@ -94,6 +94,9 @@ struct MacWardrobeView: View {
     @State private var isDropTargeted = false
     @State private var includeWishlistedOnly = false
     @State private var draftStateFilter = "All"
+    @State private var isSegmenting = false
+    @State private var pendingSegmentedItems: [SegmentedClothingItem] = []
+    @State private var isShowingSegmentationPanel = false
 
     private let sortOptions: [(String, String?, String?)] = [
         ("Newest", "dateAdded", "desc"),
@@ -125,144 +128,198 @@ struct MacWardrobeView: View {
     var body: some View {
         MacFeatureScreen(title: "Wardrobe", subtitle: "Upload, inspect, and queue your fashion archive.") {
             VStack(spacing: PluckTheme.Spacing.md) {
-                MacFeatureCard("Wardrobe controls") {
-                    HStack(spacing: PluckTheme.Spacing.md) {
-                        TextField("Search wardrobe", text: $searchText)
-                            .textFieldStyle(.roundedBorder)
 
-                        Picker("Sort", selection: $sortMode) {
-                            ForEach(sortOptions.map(\.0), id: \.self) { option in
-                                Text(option).tag(option)
+                // ── Extraction Hub ──────────────────────────────────────────
+                MacFeatureCard("The Extraction Hub") {
+                    VStack(spacing: PluckTheme.Spacing.sm) {
+                        // Drop zone
+                        ZStack {
+                            RoundedRectangle(cornerRadius: PluckTheme.Radius.medium)
+                                .fill(isDropTargeted ? PluckTheme.accent.opacity(0.05) : Color.clear)
+                            RoundedRectangle(cornerRadius: PluckTheme.Radius.medium)
+                                .stroke(
+                                    isDropTargeted ? PluckTheme.accent : PluckTheme.terminalMuter.opacity(0.35),
+                                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                                )
+
+                            VStack(spacing: PluckTheme.Spacing.sm) {
+                                ZStack {
+                                    Circle()
+                                        .fill(PluckTheme.terminalPanel)
+                                        .frame(width: 52, height: 52)
+                                    Image(systemName: "icloud.and.arrow.up")
+                                        .font(.title2)
+                                        .foregroundStyle(PluckTheme.secondaryText)
+                                }
+
+                                Text("Drop clothing images to scan")
+                                    .font(.headline)
+                                    .foregroundStyle(PluckTheme.primaryText)
+
+                                Text("Select multiple photos — AI removes backgrounds and tags attributes.")
+                                    .font(.caption)
+                                    .foregroundStyle(PluckTheme.secondaryText)
+                                    .multilineTextAlignment(.center)
+
+                                HStack(spacing: PluckTheme.Spacing.xs) {
+                                    ForEach(["JPG", "PNG", "HEIC", "MULTI-SELECT"], id: \.self) { fmt in
+                                        Text(fmt)
+                                            .font(.caption2.monospaced())
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(PluckTheme.terminalPanel)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .stroke(PluckTheme.terminalMuter.opacity(0.4), lineWidth: 1)
+                                            )
+                                            .foregroundStyle(PluckTheme.secondaryText)
+                                    }
+                                }
+                            }
+                            .padding(PluckTheme.Spacing.lg)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .contentShape(Rectangle())
+                        .onTapGesture { showingImporter = true }
+                        .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
+                            handleDrop(providers: providers)
+                        }
+
+                        // Upload queue (shown only when active)
+                        if !uploadQueue.isEmpty {
+                            Divider().background(PluckTheme.terminalMuter.opacity(0.3))
+                            HStack {
+                                Text("UPLOAD QUEUE")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(PluckTheme.terminalMuter)
+                                Spacer()
+                                Button("Review Drafts") { isUploadSheetPresented = true }
+                                    .buttonStyle(.bordered)
+                                    .tint(PluckTheme.accent)
+                                    .font(.caption)
+                            }
+                            ForEach(uploadQueue) { item in
+                                HStack {
+                                    Text(item.id.uuidString.prefix(8).uppercased())
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(PluckTheme.secondaryText)
+                                    Spacer()
+                                    stateBadge(for: item.state)
+                                }
                             }
                         }
-                        .pickerStyle(.menu)
-                        .frame(width: 140)
-
-                        Picker("Category", selection: $categoryFilter) {
-                            ForEach(categories, id: \.self) { category in
-                                Text(category).tag(category)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 160)
-
-                        Toggle("Watchlist Only", isOn: $includeWishlistedOnly)
-                            .toggleStyle(.switch)
-                            .frame(width: 155)
-
-                        Button {
-                            Task { await loadItems() }
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button {
-                            showingImporter = true
-                        } label: {
-                            Label("Upload", systemImage: "tray.and.arrow.up")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(PluckTheme.accent)
-                        .foregroundStyle(.black)
                     }
                 }
 
+                // ── Digital Archive ─────────────────────────────────────────
                 if let errorText {
                     Text(errorText)
                         .font(.caption)
                         .foregroundStyle(PluckTheme.danger)
                 }
 
-                HStack(alignment: .top, spacing: PluckTheme.Spacing.md) {
+                MacFeatureCard("Digital Archive") {
                     VStack(spacing: PluckTheme.Spacing.sm) {
-                        MacFeatureCard("Extraction Hub") {
-                            VStack(spacing: PluckTheme.Spacing.sm) {
-                                HStack {
-                                    Text("Upload queue")
-                                        .font(.caption)
-                                        .foregroundStyle(PluckTheme.secondaryText)
-                                    Spacer()
-                                    Text("Queued \(uploadQueue.count)")
-                                        .font(.caption2)
-                                        .foregroundStyle(PluckTheme.terminalMuter)
-                                }
+                        // Controls row
+                        HStack(spacing: PluckTheme.Spacing.sm) {
+                            TextField("Search by brand, color, tag…", text: $searchText)
+                                .textFieldStyle(.roundedBorder)
 
-                                ForEach(uploadQueue) { item in
-                                    HStack {
-                                        Text(item.id.uuidString.prefix(7))
-                                            .font(.caption)
-                                            .foregroundStyle(PluckTheme.secondaryText)
-                                        Spacer()
-                                        stateBadge(for: item.state)
+                            Picker("Sort", selection: $sortMode) {
+                                ForEach(sortOptions.map(\.0), id: \.self) { Text($0).tag($0) }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 140)
+
+                            Toggle("Watchlist Only", isOn: $includeWishlistedOnly)
+                                .toggleStyle(.switch)
+                                .frame(width: 155)
+
+                            Button {
+                                Task { await loadItems() }
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        // Category filter chips
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: PluckTheme.Spacing.xs) {
+                                ForEach(categories, id: \.self) { cat in
+                                    Button {
+                                        categoryFilter = cat
+                                    } label: {
+                                        Text(cat)
+                                            .font(.caption.monospaced())
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(
+                                                categoryFilter == cat
+                                                    ? PluckTheme.accent
+                                                    : PluckTheme.terminalPanel
+                                            )
+                                            .foregroundStyle(
+                                                categoryFilter == cat
+                                                    ? Color.black
+                                                    : PluckTheme.secondaryText
+                                            )
+                                            .clipShape(Capsule())
                                     }
+                                    .buttonStyle(.plain)
                                 }
-                                if uploadQueue.isEmpty {
-                                    Text("No active upload jobs.")
-                                        .font(.caption)
-                                        .foregroundStyle(PluckTheme.terminalMuter)
-                                }
+                            }
+                        }
 
-                                Divider()
+                        // Item count
+                        HStack {
+                            Text("\(filteredItems.count) ITEMS INDEXED")
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(PluckTheme.terminalMuter)
+                            Spacer()
+                        }
 
-                                Button("Review Drafts / Queue") {
-                                    isUploadSheetPresented = true
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(PluckTheme.accent)
+                        Divider().background(PluckTheme.terminalMuter.opacity(0.3))
 
-                                ScrollView {
-                                    if isLoading {
-                                        ProgressView("Loading wardrobe")
-                                            .padding(.horizontal, PluckTheme.Spacing.sm)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    } else if filteredItems.isEmpty {
-                                        ContentUnavailableView(
-                                            "No wardrobe items",
-                                            systemImage: "tshirt"
-                                        )
-                                    } else {
-                                        LazyVStack(spacing: PluckTheme.Spacing.xs) {
-                                            ForEach(filteredItems) { item in
-                                                WardrobeGridCard(
-                                                    item: item,
-                                                    isSelected: item.id == selectedItemID
-                                                )
-                                                .contentShape(Rectangle())
-                                                .onTapGesture {
-                                                    selectedItemID = item.id
-                                                }
-                                            }
+                        // Items + detail panel
+                        HStack(alignment: .top, spacing: PluckTheme.Spacing.md) {
+                            ScrollView {
+                                if isLoading {
+                                    ProgressView("Loading wardrobe")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.top, PluckTheme.Spacing.md)
+                                } else if filteredItems.isEmpty {
+                                    ContentUnavailableView(
+                                        "No wardrobe items",
+                                        systemImage: "tshirt"
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, PluckTheme.Spacing.md)
+                                } else {
+                                    LazyVStack(spacing: PluckTheme.Spacing.xs) {
+                                        ForEach(filteredItems) { item in
+                                            WardrobeGridCard(
+                                                item: item,
+                                                isSelected: item.id == selectedItemID
+                                            )
+                                            .contentShape(Rectangle())
+                                            .onTapGesture { selectedItemID = item.id }
                                         }
                                     }
                                 }
-                                .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
-                                    handleDrop(providers: providers)
-                                }
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: PluckTheme.Radius.medium)
-                                        .stroke(
-                                            isDropTargeted ? PluckTheme.accent : .clear,
-                                            style: .init(lineWidth: 2, dash: [8])
-                                        )
-                                )
-                                .frame(minWidth: 340, maxWidth: 520)
-                                .frame(maxHeight: .infinity)
                             }
-                        }
-                    }
+                            .frame(minWidth: 300, maxWidth: 480)
 
-                    MacWardrobeItemPanel(
-                        item: selectedItem,
-                        onDelete: { item in
-                            Task { await delete(item) }
-                        },
-                        onLogWear: { item in
-                            Task { await logWear(item) }
+                            MacWardrobeItemPanel(
+                                item: selectedItem,
+                                onDelete: { item in Task { await delete(item) } },
+                                onLogWear: { item in Task { await logWear(item) } }
+                            )
                         }
-                    )
+                        .frame(maxHeight: .infinity)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -294,6 +351,36 @@ struct MacWardrobeView: View {
                     try await appServices.wardrobeService.retryDraft(draft.id)
                 }
             )
+        }
+        .sheet(isPresented: $isShowingSegmentationPanel) {
+            MacClothingItemSelectionPanel(
+                items: pendingSegmentedItems,
+                onUpload: { selected in
+                    isShowingSegmentationPanel = false
+                    Task { await enqueuePresegmented(selected) }
+                },
+                onCancel: {
+                    isShowingSegmentationPanel = false
+                    pendingSegmentedItems = []
+                }
+            )
+        }
+        .overlay {
+            if isSegmenting {
+                ZStack {
+                    Color.black.opacity(0.5).ignoresSafeArea()
+                    VStack(spacing: PluckTheme.Spacing.sm) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("SEGMENTING…")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(PluckTheme.accent)
+                    }
+                    .padding(PluckTheme.Spacing.lg)
+                    .background(PluckTheme.terminalPanel)
+                    .clipShape(RoundedRectangle(cornerRadius: PluckTheme.Radius.medium))
+                }
+            }
         }
         .onChange(of: searchText) { _, _ in
             Task { await loadItems() }
@@ -364,12 +451,34 @@ struct MacWardrobeView: View {
     }
 
     private func enqueueUploads(urls: [URL]) async {
-        for url in urls {
-            guard let data = try? Data(contentsOf: url) else { continue }
-            let queueItem = UploadQueueItem(imageData: data)
+        let imageDataItems: [Data] = urls.compactMap { url in
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            return try? Data(contentsOf: url)
+        }
+        guard !imageDataItems.isEmpty else { return }
+
+        isSegmenting = true
+        var allSegmented: [SegmentedClothingItem] = []
+        for data in imageDataItems {
+            let items = await MacClothingSegmentationService.segmentIntoItems(imageData: data)
+            allSegmented.append(contentsOf: items)
+        }
+        isSegmenting = false
+
+        pendingSegmentedItems = allSegmented
+        isShowingSegmentationPanel = true
+    }
+
+    private func enqueuePresegmented(_ items: [SegmentedClothingItem]) async {
+        for item in items {
+            let queueItem = UploadQueueItem(imageData: item.imageData)
             uploadQueue.append(queueItem)
             do {
-                _ = try await appServices.wardrobeService.uploadForDraft(imageData: data)
+                _ = try await appServices.wardrobeService.uploadForDraftPresegmented(imageData: item.imageData)
+                if let index = uploadQueue.firstIndex(where: { $0.id == queueItem.id }) {
+                    uploadQueue[index].state = .uploading
+                }
             } catch {
                 if let index = uploadQueue.firstIndex(where: { $0.id == queueItem.id }) {
                     uploadQueue[index].state = .failed(error.localizedDescription)
@@ -382,12 +491,20 @@ struct MacWardrobeView: View {
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        var urls: [URL] = []
+        let group = DispatchGroup()
         for provider in providers {
+            group.enter()
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                defer { group.leave() }
                 guard let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                Task { await enqueueUploads(urls: [url]) }
+                urls.append(url)
             }
+        }
+        group.notify(queue: .main) {
+            guard !urls.isEmpty else { return }
+            Task { await enqueueUploads(urls: urls) }
         }
         return !providers.isEmpty
     }

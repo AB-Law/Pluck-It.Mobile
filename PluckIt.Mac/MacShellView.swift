@@ -68,6 +68,9 @@ struct MacShellView: View {
                 MacProfileView()
                     .opacity(active == .profile ? 1 : 0)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacTryOnView()
+                    .opacity(active == .tryOn ? 1 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .background(PluckTheme.background)
         }
@@ -90,6 +93,7 @@ private enum MacSidebarItem: String, CaseIterable, Identifiable {
     case collections
     case discover
     case stylist
+    case tryOn
     case profile
 
     var id: String { rawValue }
@@ -106,6 +110,8 @@ private enum MacSidebarItem: String, CaseIterable, Identifiable {
             return "Discover"
         case .stylist:
             return "Stylist"
+        case .tryOn:
+            return "Try On"
         case .profile:
             return "Profile"
         }
@@ -123,6 +129,8 @@ private enum MacSidebarItem: String, CaseIterable, Identifiable {
             return "sparkles"
         case .stylist:
             return "bubble.left.and.bubble.right"
+        case .tryOn:
+            return "figure.stand.dress"
         case .profile:
             return "person.crop.circle"
         }
